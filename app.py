@@ -93,7 +93,7 @@ def gerar_imagem_placa(placa_texto):
             font = ImageFont.load_default()
     
     # Apagar texto original da placa (área branca central)
-    draw.rectangle([(75, 65), (705, 215)], fill='white')
+    draw.rectangle([(70, 60), (710, 220)], fill='white')
     
     # Desenhar cada caractere com espaçamento exato da placa original
     x_inicial = 95  # Posição inicial X

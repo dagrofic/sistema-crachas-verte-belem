@@ -1,12 +1,12 @@
-from flask import Flask, request, jsonify, render_template_string, send_file
+from flask import Flask, request, jsonify, send_file, render_template_string
 from flask_cors import CORS
 import qrcode
 import base64
 from io import BytesIO
 from datetime import datetime
+from PIL import Image, ImageDraw, ImageFont
 import json
 import os
-from PIL import Image, ImageDraw, ImageFont
 
 app = Flask(__name__)
 CORS(app)
@@ -51,7 +51,6 @@ def salvar_dados(dados):
 
 def gerar_qr_code(placa, apartamento):
     """Gera QR code para a placa"""
-    # URL CORRIGIDA
     base_url = os.environ.get('BASE_URL', 'https://cracha.insuranceandreinsuranceapps.com')
     url = f"{base_url}/placa/{placa}/{apartamento}"
     
@@ -65,6 +64,59 @@ def gerar_qr_code(placa, apartamento):
     buffer.seek(0)
     
     return base64.b64encode(buffer.getvalue()).decode()
+
+def gerar_imagem_placa(placa_texto):
+    """Gera imagem da placa Mercosul com texto personalizado"""
+    # Abrir template da placa
+    template_path = 'placa-ABC-768x250.png'
+    placa = Image.open(template_path)
+    draw = ImageDraw.Draw(placa)
+    
+    # Normalizar texto da placa (remover hífen se existir)
+    placa_texto = placa_texto.upper().replace('-', '')
+    
+    # Converter formato antigo ABC1234 para Mercosul ABC1D34
+    if len(placa_texto) == 7 and placa_texto[3].isdigit():
+        # Formato antigo detectado, manter como está mas exibir em formato Mercosul
+        pass
+    
+    # Carregar fonte (usar fonte do sistema)
+    try:
+        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 130)
+    except:
+        font = ImageFont.load_default()
+    
+    # Apagar texto original da placa (área branca central)
+    # Coordenadas da área de texto: aproximadamente x=80 a x=700, y=70 a y=210
+    draw.rectangle([(80, 70), (700, 210)], fill='white')
+    
+    # Calcular posição para centralizar o texto
+    # Área útil da placa: largura ~620px (de x=80 a x=700)
+    # Altura útil: ~140px (de y=70 a y=210)
+    
+    # Desenhar cada caractere com espaçamento ajustado
+    x_inicial = 95  # Posição inicial X
+    y_posicao = 85   # Posição Y (vertical)
+    espacamento = 75  # Espaçamento entre caracteres
+    
+    for i, char in enumerate(placa_texto):
+        x_char = x_inicial + (i * espacamento)
+        draw.text((x_char, y_posicao), char, fill='black', font=font)
+    
+    # Converter para base64
+    buffer = BytesIO()
+    placa.save(buffer, format='PNG')
+    buffer.seek(0)
+    
+    return base64.b64encode(buffer.getvalue()).decode()
+
+def obter_logo_base64():
+    """Retorna logo Verte Belém em base64"""
+    logo_path = 'logoverte.jpeg'
+    if os.path.exists(logo_path):
+        with open(logo_path, 'rb') as f:
+            return base64.b64encode(f.read()).decode()
+    return ''
 
 def obter_apartamentos():
     """Lista completa de 244 apartamentos - Verte Belém (Blocos A e B)"""
@@ -99,7 +151,9 @@ def obter_apartamentos():
 def index():
     apartamentos = obter_apartamentos()
     apartamentos_options = ''.join([f'<option value="{apt}">{apt}</option>' for apt in apartamentos])
-    return render_template_string(HTML_TEMPLATE, apartamentos_options=apartamentos_options)
+    logo_base64 = obter_logo_base64()
+    
+    return render_template_string(HTML_TEMPLATE, apartamentos_options=apartamentos_options, logo_base64=logo_base64)
 
 @app.route('/gerar_qr', methods=['POST'])
 def gerar_qr():
@@ -112,6 +166,9 @@ def gerar_qr():
     
     # Gerar QR code
     qr_code_base64 = gerar_qr_code(placa, apartamento)
+    
+    # Gerar imagem da placa
+    placa_imagem_base64 = gerar_imagem_placa(placa)
     
     # Salvar no arquivo JSON
     dados = carregar_dados()
@@ -126,6 +183,7 @@ def gerar_qr():
     return jsonify({
         'qr_code': qr_code_base64,
         'placa': placa.upper(),
+        'placa_imagem': placa_imagem_base64,
         'apartamento': apartamento
     })
 
@@ -157,69 +215,22 @@ def exportar_csv():
 
 @app.route('/placa/<placa>/<apartamento>')
 def visualizar_placa(placa, apartamento):
-    """Rota para visualizar informações da placa via QR Code"""
-    return render_template_string('''
-    <!DOCTYPE html>
-    <html lang="pt-BR">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Crachá - Verte Belém</title>
-        <style>
-            body {
-                font-family: Arial, sans-serif;
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                min-height: 100vh;
-                display: flex;
-                justify-content: center;
-                align-items: center;
-                padding: 20px;
-            }
-            .card {
-                background: white;
-                border-radius: 20px;
-                padding: 40px;
-                box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-                text-align: center;
-                max-width: 500px;
-            }
-            h1 {
-                color: #667eea;
-                margin-bottom: 30px;
-            }
-            .info {
-                font-size: 24px;
-                margin: 20px 0;
-                padding: 15px;
-                background: #f5f5f5;
-                border-radius: 10px;
-            }
-            .label {
-                color: #666;
-                font-size: 16px;
-                font-weight: 600;
-            }
-            .value {
-                color: #333;
-                font-weight: bold;
-            }
-        </style>
-    </head>
-    <body>
-        <div class="card">
-            <h1>🏢 Condomínio Verte Belém</h1>
-            <div class="info">
-                <div class="label">Apartamento</div>
-                <div class="value">{{ apartamento }}</div>
-            </div>
-            <div class="info">
-                <div class="label">Placa do Veículo</div>
-                <div class="value">{{ placa }}</div>
-            </div>
-        </div>
-    </body>
-    </html>
-    ''', placa=placa.upper(), apartamento=apartamento)
+    """Página de visualização da placa"""
+    dados = carregar_dados()
+    registro = next((item for item in dados if item['placa'] == placa.upper() and item['apartamento'] == apartamento), None)
+    
+    if not registro:
+        return "Placa não encontrada", 404
+    
+    logo_base64 = obter_logo_base64()
+    placa_imagem_base64 = gerar_imagem_placa(placa)
+    
+    return render_template_string(VISUALIZACAO_TEMPLATE, 
+                                   apartamento=apartamento,
+                                   placa=placa.upper(),
+                                   data_hora=registro['data_hora'],
+                                   logo_base64=logo_base64,
+                                   placa_imagem_base64=placa_imagem_base64)
 
 HTML_TEMPLATE = '''
 <!DOCTYPE html>
@@ -227,7 +238,7 @@ HTML_TEMPLATE = '''
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema de Crachás - Verte Belém</title>
+    <title>Sistema de Crachás - Condomínio Verte Belém</title>
     <style>
         * {
             margin: 0;
@@ -250,8 +261,18 @@ HTML_TEMPLATE = '''
             border-radius: 20px;
             box-shadow: 0 20px 60px rgba(0,0,0,0.3);
             padding: 40px;
-            max-width: 800px;
+            max-width: 900px;
             width: 100%;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .header img {
+            max-width: 150px;
+            margin-bottom: 15px;
         }
         
         h1 {
@@ -263,9 +284,9 @@ HTML_TEMPLATE = '''
         
         .subtitle {
             text-align: center;
-            color: #999;
-            margin-bottom: 30px;
+            color: #666;
             font-size: 14px;
+            margin-bottom: 30px;
         }
         
         .form-group {
@@ -326,39 +347,42 @@ HTML_TEMPLATE = '''
         
         #resultado {
             margin-top: 30px;
-            text-align: center;
             display: none;
         }
         
-        .cracha-preview {
+        .cracha {
             background: white;
             border: 3px solid #667eea;
             border-radius: 15px;
             padding: 30px;
-            margin: 20px auto;
-            max-width: 400px;
+            text-align: center;
             box-shadow: 0 10px 30px rgba(0,0,0,0.2);
         }
         
-        .cracha-apartamento {
-            font-size: 48px;
-            font-weight: bold;
-            color: #333;
+        .cracha-header {
             margin-bottom: 20px;
         }
         
-        .cracha-logo {
-            width: 150px;
-            height: 150px;
-            margin: 20px auto;
-            background: #c41e3a;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 48px;
+        .cracha-header img {
+            max-width: 120px;
+            margin-bottom: 10px;
+        }
+        
+        .cracha-apartamento {
+            font-size: 32px;
             font-weight: bold;
+            color: #667eea;
+            margin: 15px 0;
+        }
+        
+        .cracha-placa-img {
+            margin: 20px 0;
+        }
+        
+        .cracha-placa-img img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
         }
         
         .cracha-qr {
@@ -367,73 +391,14 @@ HTML_TEMPLATE = '''
         
         .cracha-qr img {
             max-width: 200px;
-            border: 2px solid #ddd;
+            border: 2px solid #e0e0e0;
             border-radius: 8px;
         }
         
-        .cracha-placa {
-            margin-top: 20px;
-        }
-        
-        .placa-mercosul {
-            background: white;
-            border: 3px solid #000;
-            border-radius: 10px;
-            padding: 10px;
-            margin: 10px auto;
-            max-width: 350px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
-        }
-        
-        .placa-header {
-            background: linear-gradient(to bottom, #0033a0 0%, #0055cc 100%);
-            color: white;
-            padding: 8px;
-            border-radius: 5px 5px 0 0;
-            text-align: center;
-            font-weight: bold;
-            font-size: 18px;
-            position: relative;
-        }
-        
-        .placa-mercosul-text {
-            position: absolute;
-            left: 10px;
-            top: 50%;
-            transform: translateY(-50%);
-            font-size: 10px;
-        }
-        
-        .placa-bandeira {
-            position: absolute;
-            right: 10px;
-            top: 50%;
-            transform: translateY(-50%);
-            font-size: 24px;
-        }
-        
-        .placa-numero {
-            background: white;
-            padding: 15px;
-            text-align: center;
-            font-size: 48px;
-            font-weight: bold;
-            letter-spacing: 8px;
-            color: #000;
-            font-family: 'Courier New', monospace;
-        }
-        
-        .placa-br {
-            position: absolute;
-            left: 15px;
-            top: 50%;
-            transform: translateY(-50%);
+        .cracha-info {
             font-size: 14px;
-            font-weight: bold;
-            background: white;
-            padding: 2px 5px;
-            border: 1px solid #000;
-            border-radius: 3px;
+            color: #666;
+            margin-top: 15px;
         }
         
         .btn-imprimir {
@@ -513,14 +478,22 @@ HTML_TEMPLATE = '''
             body {
                 background: white;
             }
+            
             .container {
                 box-shadow: none;
+                padding: 0;
             }
+            
             .form-group, .relatorio, button:not(.btn-imprimir) {
                 display: none !important;
             }
+            
             #resultado {
                 display: block !important;
+            }
+            
+            .btn-imprimir {
+                display: none !important;
             }
         }
         
@@ -540,157 +513,184 @@ HTML_TEMPLATE = '''
             th, td {
                 padding: 8px;
             }
-            
-            .placa-numero {
-                font-size: 32px;
-                letter-spacing: 4px;
-            }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🚗 Sistema de Crachás Veiculares</h1>
-        <div class="subtitle">Condomínio Verte Belém</div>
-        <div class="subtitle" style="color: #667eea; font-weight: bold;">Apartamento (242 unidades - Blocos A e B)</div>
+        <div class="header">
+            {% if logo_base64 %}
+            <img src="data:image/jpeg;base64,{{ logo_base64 }}" alt="Logo Verte Belém">
+            {% endif %}
+            <h1>Sistema de Crachás Veiculares</h1>
+            <div class="subtitle">Condomínio Verte Belém - 244 Apartamentos</div>
+        </div>
         
         <div class="form-group">
-            <label for="apartamento">Apartamento</label>
-            <select id="apartamento" required>
-                <option value="">Selecione o apartamento</option>
+            <label for="apartamento">Apartamento:</label>
+            <select id="apartamento" name="apartamento">
                 {{ apartamentos_options|safe }}
             </select>
         </div>
         
         <div class="form-group">
-            <label for="placa">Placa do Veículo</label>
-            <input type="text" id="placa" placeholder="ABC1D23 ou ABC-1234" required>
-            <div class="format-hint">Formatos aceitos: Mercosul (ABC1D23) ou Antigo (ABC-1234)</div>
+            <label for="placa">Placa do Veículo:</label>
+            <input type="text" id="placa" name="placa" placeholder="ABC1D34 ou ABC-1234" maxlength="8">
+            <div class="format-hint">Formatos aceitos: Mercosul (ABC1D34) ou Antigo (ABC-1234)</div>
         </div>
         
-        <button onclick="gerarCracha()">Gerar Crachá com QR Code</button>
+        <button onclick="gerarCracha()">Gerar Crachá</button>
         
         <div id="resultado">
-            <h2 style="color: #11998e;">✅ Crachá Gerado com Sucesso!</h2>
-            <div class="cracha-preview">
-                <div class="cracha-apartamento" id="apt-resultado"></div>
-                <div class="cracha-logo">V</div>
-                <div class="cracha-qr">
-                    <img id="qrcode" src="" alt="QR Code">
+            <div class="cracha" id="cracha-print">
+                <div class="cracha-header">
+                    {% if logo_base64 %}
+                    <img src="data:image/jpeg;base64,{{ logo_base64 }}" alt="Logo Verte Belém">
+                    {% endif %}
+                    <div class="cracha-apartamento">Apartamento: <span id="apt-numero"></span></div>
                 </div>
-                <div class="cracha-placa">
-                    <div class="placa-mercosul">
-                        <div class="placa-header">
-                            <span class="placa-mercosul-text">MERCOSUL</span>
-                            BRASIL
-                            <span class="placa-bandeira">🇧🇷</span>
-                        </div>
-                        <div class="placa-numero" style="position: relative;">
-                            <span class="placa-br">BR</span>
-                            <span id="placa-resultado"></span>
-                        </div>
-                    </div>
+                
+                <div class="cracha-placa-img">
+                    <img id="placa-imagem" src="" alt="Placa do Veículo">
+                </div>
+                
+                <div class="cracha-qr">
+                    <img id="qr-code" src="" alt="QR Code">
+                </div>
+                
+                <div class="cracha-info">
+                    <p><strong>Placa:</strong> <span id="placa-texto"></span></p>
+                    <p><strong>Escaneie o QR Code para verificar</strong></p>
                 </div>
             </div>
+            
             <button class="btn-imprimir" onclick="window.print()">🖨️ Imprimir Crachá</button>
         </div>
         
         <div class="relatorio">
             <h2>
-                📊 Relatório de Crachás
+                <span>Crachás Gerados</span>
                 <div class="btn-group">
-                    <button class="btn-secondary" onclick="atualizarRelatorio()">🔄 Atualizar</button>
+                    <button class="btn-secondary" onclick="carregarRelatorio()">🔄 Atualizar</button>
                     <button class="btn-secondary" onclick="exportarCSV()">📥 Exportar CSV</button>
                 </div>
             </h2>
+            
             <table id="tabela-relatorio">
                 <thead>
                     <tr>
                         <th>Data/Hora</th>
                         <th>Apartamento</th>
                         <th>Placa</th>
-                        <th>Ação</th>
+                        <th>Ações</th>
                     </tr>
                 </thead>
                 <tbody id="corpo-tabela">
+                    <tr>
+                        <td colspan="4" style="text-align: center;">Carregando...</td>
+                    </tr>
                 </tbody>
             </table>
-            <div class="total" id="total-registros"></div>
+            
+            <div class="total" id="total-crachas">Total: 0 crachás</div>
         </div>
     </div>
     
     <script>
-        function gerarCracha() {
+        async function gerarCracha() {
             const apartamento = document.getElementById('apartamento').value;
-            const placa = document.getElementById('placa').value;
+            const placa = document.getElementById('placa').value.trim();
             
-            if (!apartamento || !placa) {
-                alert('Por favor, preencha todos os campos!');
+            if (!placa) {
+                alert('Por favor, informe a placa do veículo');
                 return;
             }
             
-            fetch('/gerar_qr', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ apartamento, placa })
-            })
-            .then(response => response.json())
-            .then(data => {
-                document.getElementById('qrcode').src = 'data:image/png;base64,' + data.qr_code;
-                document.getElementById('apt-resultado').textContent = data.apartamento;
-                document.getElementById('placa-resultado').textContent = data.placa;
+            try {
+                const response = await fetch('/gerar_qr', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ placa, apartamento })
+                });
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    alert(data.error);
+                    return;
+                }
+                
+                // Atualizar crachá
+                document.getElementById('apt-numero').textContent = data.apartamento;
+                document.getElementById('placa-texto').textContent = data.placa;
+                document.getElementById('qr-code').src = 'data:image/png;base64,' + data.qr_code;
+                document.getElementById('placa-imagem').src = 'data:image/png;base64,' + data.placa_imagem;
+                
+                // Mostrar resultado
                 document.getElementById('resultado').style.display = 'block';
                 
-                // Rolar para o resultado
+                // Atualizar relatório
+                carregarRelatorio();
+                
+                // Scroll suave para o resultado
                 document.getElementById('resultado').scrollIntoView({ behavior: 'smooth' });
                 
-                // Limpar formulário
-                document.getElementById('apartamento').value = '';
-                document.getElementById('placa').value = '';
-                
-                // Atualizar relatório
-                atualizarRelatorio();
-            })
-            .catch(error => {
-                alert('Erro ao gerar crachá: ' + error);
-            });
+            } catch (error) {
+                alert('Erro ao gerar crachá: ' + error.message);
+            }
         }
         
-        function atualizarRelatorio() {
-            fetch('/relatorio')
-            .then(response => response.json())
-            .then(data => {
+        async function carregarRelatorio() {
+            try {
+                const response = await fetch('/relatorio');
+                const dados = await response.json();
+                
                 const tbody = document.getElementById('corpo-tabela');
                 tbody.innerHTML = '';
                 
-                data.forEach((item, index) => {
-                    const tr = document.createElement('tr');
-                    tr.innerHTML = `
-                        <td>${item.data_hora}</td>
-                        <td>${item.apartamento}</td>
-                        <td>${item.placa}</td>
-                        <td><button class="btn-excluir" onclick="excluirRegistro(${index})">🗑️ Excluir</button></td>
-                    `;
-                    tbody.appendChild(tr);
-                });
+                if (dados.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="4" style="text-align: center;">Nenhum crachá gerado ainda</td></tr>';
+                } else {
+                    dados.reverse().forEach((item, index) => {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td>${item.data_hora}</td>
+                            <td>${item.apartamento}</td>
+                            <td>${item.placa}</td>
+                            <td>
+                                <button class="btn-excluir" onclick="excluirCracha(${dados.length - 1 - index})">🗑️ Excluir</button>
+                            </td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                }
                 
-                document.getElementById('total-registros').textContent = `Total de registros: ${data.length}`;
-            });
+                document.getElementById('total-crachas').textContent = `Total: ${dados.length} crachás`;
+                
+            } catch (error) {
+                console.error('Erro ao carregar relatório:', error);
+            }
         }
         
-        function excluirRegistro(index) {
-            if (confirm('Deseja realmente excluir este registro?')) {
-                fetch(`/excluir/${index}`, {
+        async function excluirCracha(index) {
+            if (!confirm('Deseja realmente excluir este crachá?')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/excluir/${index}`, {
                     method: 'DELETE'
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        atualizarRelatorio();
-                    }
                 });
+                
+                if (response.ok) {
+                    carregarRelatorio();
+                } else {
+                    alert('Erro ao excluir crachá');
+                }
+            } catch (error) {
+                alert('Erro ao excluir crachá: ' + error.message);
             }
         }
         
@@ -699,12 +699,126 @@ HTML_TEMPLATE = '''
         }
         
         // Carregar relatório ao iniciar
-        atualizarRelatorio();
+        carregarRelatorio();
+        
+        // Permitir Enter para gerar crachá
+        document.getElementById('placa').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                gerarCracha();
+            }
+        });
     </script>
 </body>
 </html>
 '''
 
+VISUALIZACAO_TEMPLATE = '''
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crachá Veicular - {{ apartamento }}</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .cracha-container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+            text-align: center;
+        }
+        
+        .logo {
+            max-width: 150px;
+            margin-bottom: 20px;
+        }
+        
+        h1 {
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 24px;
+        }
+        
+        .apartamento {
+            font-size: 48px;
+            font-weight: bold;
+            color: #667eea;
+            margin: 20px 0;
+        }
+        
+        .placa-imagem {
+            margin: 30px 0;
+        }
+        
+        .placa-imagem img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+        
+        .info {
+            background: #f5f5f5;
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 20px;
+        }
+        
+        .info p {
+            margin: 10px 0;
+            color: #333;
+            font-size: 16px;
+        }
+        
+        .data-hora {
+            color: #666;
+            font-size: 14px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="cracha-container">
+        {% if logo_base64 %}
+        <img src="data:image/jpeg;base64,{{ logo_base64 }}" alt="Logo Verte Belém" class="logo">
+        {% endif %}
+        
+        <h1>Condomínio Verte Belém</h1>
+        
+        <div class="apartamento">Apartamento {{ apartamento }}</div>
+        
+        <div class="placa-imagem">
+            <img src="data:image/png;base64,{{ placa_imagem_base64 }}" alt="Placa {{ placa }}">
+        </div>
+        
+        <div class="info">
+            <p><strong>Placa:</strong> {{ placa }}</p>
+            <p><strong>Apartamento:</strong> {{ apartamento }}</p>
+            <p class="data-hora">Registrado em: {{ data_hora }}</p>
+        </div>
+    </div>
+</body>
+</html>
+'''
+
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 8080))
-    app.run(host='0.0.0.0', port=port, debug=False)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=True)

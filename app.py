@@ -80,14 +80,16 @@ def gerar_imagem_placa(placa_texto):
         # Formato antigo detectado, manter como está mas exibir em formato Mercosul
         pass
     
-    # Carregar fonte (usar fonte do sistema)
-    # Carregar fonte Liberation Sans Bold (tamanho exato da placa original)
+    # Carregar fonte Liberation Sans Bold (incluída no repositório)
     try:
-        font = ImageFont.truetype("/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf", 140)
+        # Tentar carregar fonte local do repositório
+        font = ImageFont.truetype("LiberationSans-Bold.ttf", 140)
     except:
         try:
-            font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 140)
+            # Fallback: tentar fonte do sistema
+            font = ImageFont.truetype("/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf", 140)
         except:
+            # Último fallback: fonte padrão
             font = ImageFont.load_default()
     
     # Apagar texto original da placa (área branca central)

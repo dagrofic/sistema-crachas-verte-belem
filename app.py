@@ -80,14 +80,14 @@ def gerar_imagem_placa(placa_texto):
         # Formato antigo detectado, manter como está mas exibir em formato Mercosul
         pass
     
-    # Carregar fonte Liberation Sans Bold (incluída no repositório)
+    # Carregar fonte FE-Font (fonte oficial de placas veiculares)
     try:
-        # Tentar carregar fonte local do repositório
-        font = ImageFont.truetype("LiberationSans-Bold.ttf", 140)
+        # Tentar carregar fonte FE-Font do repositório
+        font = ImageFont.truetype("FE-FONT.TTF", 160)
     except:
         try:
-            # Fallback: tentar fonte do sistema
-            font = ImageFont.truetype("/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf", 140)
+            # Fallback: Liberation Sans Bold
+            font = ImageFont.truetype("LiberationSans-Bold.ttf", 140)
         except:
             # Último fallback: fonte padrão
             font = ImageFont.load_default()
@@ -96,9 +96,9 @@ def gerar_imagem_placa(placa_texto):
     draw.rectangle([(70, 60), (710, 220)], fill='white')
     
     # Desenhar cada caractere com espaçamento exato da placa original
-    x_inicial = 95  # Posição inicial X
-    y_posicao = 72   # Posição Y (vertical)
-    espacamento = 76  # Espaçamento entre caracteres (medido da placa original)
+    x_inicial = 92  # Posição inicial X
+    y_posicao = 73   # Posição Y (vertical)
+    espacamento = 77  # Espaçamento entre caracteres (medido da placa original)
     
     for i, char in enumerate(placa_texto):
         x_char = x_inicial + (i * espacamento)

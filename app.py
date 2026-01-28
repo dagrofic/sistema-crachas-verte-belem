@@ -65,26 +65,33 @@ def gerar_qr_code(placa, apartamento):
     return base64.b64encode(buffer.getvalue()).decode()
 
 def obter_apartamentos():
-    """Lista completa de 244 apartamentos - Verte Belém"""
+    """Lista completa de 236 apartamentos - Verte Belém (Blocos A e B)"""
+    # Números dos apartamentos conforme PDF oficial
+    numeros = [
+        '006', '007', '011', '012', '013', '014', '015', '016', '017', '018',
+        '021', '022', '023', '024', '025', '026', '027', '028',
+        '031', '032', '033', '034', '035', '036', '037', '038',
+        '041', '042', '043', '044', '045', '046', '047', '048',
+        '051', '052', '053', '054', '055', '056', '057', '058',
+        '061', '062', '063', '064', '065', '066', '067', '068',
+        '071', '072', '073', '074', '075', '076', '077', '078',
+        '081', '082', '083', '084', '085', '086', '087', '088',
+        '091', '092', '093', '094', '095', '096', '097', '098',
+        '101', '102', '103', '104', '105', '106', '107', '108',
+        '111', '112', '113', '114', '115', '116', '117', '118',
+        '121', '122', '123', '124', '125', '126', '127', '128',
+        '131', '132', '133', '134', '135', '136', '137', '138',
+        '141', '142', '143', '144', '145', '146', '147', '148',
+        '151', '152', '153', '154', '155', '156', '157', '158'
+    ]
+    
     apartamentos = []
+    # Gerar apartamentos para Bloco A e B em ordem
+    for num in numeros:
+        apartamentos.append(f'{num}A')
+        apartamentos.append(f'{num}B')
     
-    # BLOCO A - Apartamentos 006A até 158A
-    for andar in range(0, 16):  # 0 a 15
-        for apt in range(6, 9):  # 6, 7, 8
-            if andar == 0:
-                apartamentos.append(f"{apt:03d}A")
-            else:
-                apartamentos.append(f"{andar}{apt}A")
-    
-    # BLOCO B - Apartamentos 006B até 158B  
-    for andar in range(0, 16):  # 0 a 15
-        for apt in range(6, 9):  # 6, 7, 8
-            if andar == 0:
-                apartamentos.append(f"{apt:03d}B")
-            else:
-                apartamentos.append(f"{andar}{apt}B")
-    
-    return sorted(apartamentos)
+    return apartamentos
 
 @app.route('/')
 def index():
@@ -99,59 +106,54 @@ def gerar_qr():
     placa = data.get('placa')
     apartamento = data.get('apartamento')
     
-    qr_code = gerar_qr_code(placa, apartamento)
+    if not placa or not apartamento:
+        return jsonify({'error': 'Placa e apartamento são obrigatórios'}), 400
+    
+    # Gerar QR code
+    qr_code_base64 = gerar_qr_code(placa, apartamento)
+    
+    # Salvar no arquivo JSON
+    dados = carregar_dados()
+    novo_cracha = {
+        'apartamento': apartamento,
+        'placa': placa.upper(),
+        'data_hora': datetime.now().strftime('%d/%m/%Y %H:%M:%S')
+    }
+    dados.append(novo_cracha)
+    salvar_dados(dados)
     
     return jsonify({
-        'success': True,
-        'qr_code': qr_code
+        'qr_code': qr_code_base64,
+        'placa': placa.upper(),
+        'apartamento': apartamento
     })
 
-@app.route('/salvar_cracha', methods=['POST'])
-def salvar_cracha():
-    data = request.get_json()
-    
-    dados = carregar_dados()
-    dados.append({
-        'apartamento': data.get('apartamento'),
-        'placa': data.get('placa'),
-        'data_hora': data.get('data_hora')
-    })
-    
-    if salvar_dados(dados):
-        return jsonify({'success': True})
-    else:
-        return jsonify({'success': False, 'error': 'Erro ao salvar dados'})
-
-@app.route('/relatorio')
+@app.route('/relatorio', methods=['GET'])
 def relatorio():
     dados = carregar_dados()
-    # Ordenar por apartamento
-    dados.sort(key=lambda x: x['apartamento'])
-    
-    return jsonify({
-        'success': True,
-        'dados': dados,
-        'total': len(dados)
-    })
+    return jsonify(dados)
 
-@app.route('/excluir_cracha', methods=['POST'])
-def excluir_cracha():
-    data = request.get_json()
-    index = data.get('index')
-    
+@app.route('/excluir/<int:index>', methods=['DELETE'])
+def excluir(index):
     dados = carregar_dados()
     if 0 <= index < len(dados):
         dados.pop(index)
-        if salvar_dados(dados):
-            return jsonify({'success': True})
+        salvar_dados(dados)
+        return jsonify({'success': True})
+    return jsonify({'error': 'Índice inválido'}), 400
+
+@app.route('/exportar_csv', methods=['GET'])
+def exportar_csv():
+    dados = carregar_dados()
+    csv_content = "Data/Hora,Apartamento,Placa\n"
+    for item in dados:
+        csv_content += f"{item['data_hora']},{item['apartamento']},{item['placa']}\n"
     
-    return jsonify({'success': False, 'error': 'Erro ao excluir registro'})
+    return csv_content, 200, {
+        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Disposition': 'attachment; filename=crachas_verte_belem.csv'
+    }
 
-@app.route('/placa/<placa>/<apartamento>')
-def mostrar_placa(placa, apartamento):
-    return render_template_string(PLACA_TEMPLATE, placa=placa, apartamento=apartamento)
-
-# Template HTML principal
 HTML_TEMPLATE = '''
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -165,206 +167,185 @@ HTML_TEMPLATE = '''
             padding: 0;
             box-sizing: border-box;
         }
+        
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
-            padding: 15px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
         }
+        
         .container {
-            max-width: 800px;
-            margin: 0 auto;
             background: white;
             border-radius: 20px;
-            padding: 30px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 40px;
+            max-width: 800px;
+            width: 100%;
         }
+        
         h1 {
             text-align: center;
-            color: #333;
+            color: #667eea;
             margin-bottom: 30px;
             font-size: 28px;
-            font-weight: 700;
         }
+        
         .form-group {
-            margin-bottom: 20px;
+            margin-bottom: 25px;
         }
-        .form-group label {
+        
+        label {
             display: block;
             margin-bottom: 8px;
+            color: #333;
             font-weight: 600;
-            color: #555;
             font-size: 16px;
         }
-        .form-control {
+        
+        select, input {
             width: 100%;
             padding: 12px;
-            border: 2px solid #ddd;
-            border-radius: 10px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
             font-size: 16px;
             transition: all 0.3s;
         }
-        .form-control:focus {
+        
+        select:focus, input:focus {
             outline: none;
             border-color: #667eea;
             box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
         }
-        .btn {
-            padding: 12px 24px;
-            border: none;
-            border-radius: 10px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s;
-            margin: 5px;
+        
+        .format-hint {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
         }
-        .btn-primary {
+        
+        button {
+            width: 100%;
+            padding: 15px;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            margin-top: 10px;
         }
-        .btn-primary:hover {
+        
+        button:hover {
             transform: translateY(-2px);
             box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
         }
-        .btn-secondary {
-            background: #6c757d;
-            color: white;
+        
+        button:active {
+            transform: translateY(0);
         }
-        .btn-success {
-            background: #28a745;
-            color: white;
+        
+        #resultado {
+            margin-top: 30px;
+            text-align: center;
+            display: none;
         }
-        .btn-danger {
-            background: #dc3545;
-            color: white;
-            padding: 8px 16px;
-            font-size: 14px;
+        
+        #resultado img {
+            max-width: 300px;
+            border: 3px solid #667eea;
+            border-radius: 10px;
+            margin: 20px 0;
         }
-        .relatorio-section {
+        
+        .relatorio {
             margin-top: 40px;
-            padding: 20px;
-            background: #f8f9fa;
-            border-radius: 15px;
         }
-        .relatorio-titulo {
+        
+        .relatorio h2 {
+            color: #667eea;
+            margin-bottom: 20px;
             display: flex;
             align-items: center;
             justify-content: space-between;
-            margin-bottom: 20px;
-            font-size: 20px;
-            font-weight: 700;
-            color: #333;
         }
-        .relatorio-tabela {
+        
+        .btn-group {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .btn-secondary {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            padding: 10px 20px;
+            font-size: 14px;
+            width: auto;
+        }
+        
+        table {
             width: 100%;
             border-collapse: collapse;
+            margin-top: 20px;
             background: white;
-            border-radius: 10px;
+            border-radius: 8px;
             overflow: hidden;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
         }
-        .relatorio-tabela th {
+        
+        th {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             padding: 15px;
             text-align: left;
             font-weight: 600;
         }
-        .relatorio-tabela td {
-            padding: 15px;
-            border-bottom: 1px solid #eee;
+        
+        td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #e0e0e0;
         }
-        .relatorio-tabela tr:hover {
-            background: #f8f9fa;
+        
+        tr:hover {
+            background: #f5f5f5;
         }
-        .total-registros {
+        
+        .btn-excluir {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            padding: 6px 12px;
+            font-size: 12px;
+            width: auto;
+            margin: 0;
+        }
+        
+        .total {
             text-align: center;
             margin-top: 15px;
-            padding: 10px;
-            background: #e7f3ff;
-            border-radius: 10px;
-            font-weight: 600;
-            color: #0066cc;
-        }
-        .success-message {
-            background: #d4edda;
-            color: #155724;
             padding: 15px;
-            border-radius: 10px;
-            margin: 20px 0;
-            text-align: center;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 8px;
             font-weight: 600;
         }
-        .cracha-container {
-            display: none;
-            margin: 30px auto;
-            text-align: center;
-        }
-        .cracha-content {
-            width: 340px;
-            height: 454px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 15px;
-            padding: 30px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-            border: 2px solid #ddd;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-        }
-        .apartamento-numero {
-            font-size: 64px;
-            font-weight: 900;
-            text-align: center;
-            color: #333;
-            margin-bottom: 20px;
-        }
-        .logo-verte {
-            width: 140px;
-            height: 140px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border-radius: 50%;
-            margin: 20px auto;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 32px;
-            font-weight: 300;
-        }
-        .qr-code {
-            width: 120px;
-            height: 120px;
-            margin: 20px auto;
-            border: 2px solid #667eea;
-            border-radius: 10px;
-        }
-        @media (max-width: 768px) {
+        
+        @media (max-width: 600px) {
             .container {
-                padding: 15px;
+                padding: 20px;
             }
+            
             h1 {
                 font-size: 22px;
             }
-            .cracha-content {
-                width: 280px;
-                height: 374px;
-                padding: 20px;
+            
+            table {
+                font-size: 14px;
             }
-            .apartamento-numero {
-                font-size: 48px;
-            }
-            .logo-verte {
-                width: 100px;
-                height: 100px;
-                font-size: 24px;
-            }
-            .qr-code {
-                width: 90px;
-                height: 90px;
+            
+            th, td {
+                padding: 8px;
             }
         }
     </style>
@@ -375,7 +356,7 @@ HTML_TEMPLATE = '''
         
         <div class="form-group">
             <label for="apartamento">🏠 Apartamento:</label>
-            <select id="apartamento" class="form-control">
+            <select id="apartamento" required>
                 <option value="">Selecione o apartamento</option>
                 {{ apartamentos_options|safe }}
             </select>
@@ -383,49 +364,28 @@ HTML_TEMPLATE = '''
         
         <div class="form-group">
             <label for="placa">🚗 Placa do Veículo:</label>
-            <input type="text" id="placa" class="form-control" 
-                   placeholder="Ex: ABC1D34 ou ABC-1234" maxlength="8">
-            <small style="color: #666; margin-top: 5px; display: block;">
-                Formatos aceitos: ABC1D34 (Mercosul) ou ABC-1234 (Antigo)
-            </small>
+            <input type="text" id="placa" placeholder="Ex: ABC1D34 ou ABC-1234" required>
+            <div class="format-hint">Formatos aceitos: ABC1D34 (Mercosul) ou ABC-1234 (Antigo)</div>
         </div>
         
-        <button class="btn btn-primary" onclick="gerarCracha()">
-            🎫 Gerar Crachá
-        </button>
+        <button onclick="gerarCracha()">🎫 Gerar Crachá</button>
         
-        <div id="successMessage"></div>
-        
-        <div id="crachaGerado" class="cracha-container">
-            <div class="cracha-content">
-                <div id="apartamentoNumero" class="apartamento-numero"></div>
-                <div class="logo-verte">
-                    <div>verte</div>
-                    <div style="font-size: 14px;">Belém</div>
-                </div>
-                <img id="qrcode" class="qr-code" alt="QR Code">
-            </div>
-            
-            <div style="margin-top: 20px;">
-                <button class="btn btn-primary" onclick="imprimirCracha()">🖨️ Imprimir</button>
-                <button class="btn btn-secondary" onclick="testarQR()">📱 Testar QR</button>
-            </div>
+        <div id="resultado">
+            <h2>✅ Crachá Gerado com Sucesso!</h2>
+            <img id="qrcode" src="" alt="QR Code">
+            <p><strong>Apartamento:</strong> <span id="apt-resultado"></span></p>
+            <p><strong>Placa:</strong> <span id="placa-resultado"></span></p>
         </div>
         
-        <div class="relatorio-section">
-            <div class="relatorio-titulo">
-                <span>📊 Relatório de Crachás</span>
-                <div>
-                    <button class="btn btn-secondary" onclick="atualizarRelatorio()">
-                        📋 Atualizar Relatório
-                    </button>
-                    <button class="btn btn-success" onclick="exportarCSV()">
-                        📄 Exportar CSV
-                    </button>
+        <div class="relatorio">
+            <h2>
+                📊 Relatório de Crachás
+                <div class="btn-group">
+                    <button class="btn-secondary" onclick="atualizarRelatorio()">🔄 Atualizar Relatório</button>
+                    <button class="btn-secondary" onclick="exportarCSV()">📄 Exportar CSV</button>
                 </div>
-            </div>
-            
-            <table class="relatorio-tabela">
+            </h2>
+            <table id="tabela-relatorio">
                 <thead>
                     <tr>
                         <th>Data/Hora</th>
@@ -434,77 +394,46 @@ HTML_TEMPLATE = '''
                         <th>Ações</th>
                     </tr>
                 </thead>
-                <tbody id="relatorioBody">
+                <tbody id="corpo-tabela">
                 </tbody>
             </table>
-            
-            <div id="totalRegistros" class="total-registros"></div>
+            <div class="total" id="total-registros"></div>
         </div>
     </div>
-
+    
     <script>
         function gerarCracha() {
             const apartamento = document.getElementById('apartamento').value;
-            const placa = document.getElementById('placa').value.toUpperCase();
+            const placa = document.getElementById('placa').value;
             
             if (!apartamento || !placa) {
                 alert('Por favor, preencha todos os campos!');
                 return;
             }
             
-            // Validar formato da placa
-            const formatoMercosul = /^[A-Z]{3}[0-9][A-Z][0-9]{2}$/;
-            const formatoAntigo = /^[A-Z]{3}-?[0-9]{4}$/;
-            
-            if (!formatoMercosul.test(placa) && !formatoAntigo.test(placa)) {
-                alert('Formato de placa inválido! Use: ABC1D34 ou ABC-1234');
-                return;
-            }
-            
-            // Gerar QR Code
             fetch('/gerar_qr', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ placa: placa, apartamento: apartamento })
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ apartamento, placa })
             })
             .then(response => response.json())
             .then(data => {
-                if (data.success) {
-                    // Exibir crachá
-                    document.getElementById('apartamentoNumero').textContent = apartamento;
-                    document.getElementById('qrcode').src = 'data:image/png;base64,' + data.qr_code;
-                    document.getElementById('crachaGerado').style.display = 'block';
-                    
-                    // Salvar no servidor
-                    return fetch('/salvar_cracha', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ 
-                            placa: placa, 
-                            apartamento: apartamento,
-                            data_hora: new Date().toLocaleString('pt-BR')
-                        })
-                    });
-                }
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    // Mensagem de sucesso
-                    document.getElementById('successMessage').innerHTML = 
-                        '<div class="success-message">✅ Crachá gerado e salvo com sucesso!</div>';
-                    
-                    // Atualizar relatório
-                    setTimeout(atualizarRelatorio, 500);
-                    
-                    // Limpar campos
-                    document.getElementById('apartamento').value = '';
-                    document.getElementById('placa').value = '';
-                }
+                document.getElementById('qrcode').src = 'data:image/png;base64,' + data.qr_code;
+                document.getElementById('apt-resultado').textContent = data.apartamento;
+                document.getElementById('placa-resultado').textContent = data.placa;
+                document.getElementById('resultado').style.display = 'block';
+                
+                // Limpar formulário
+                document.getElementById('apartamento').value = '';
+                document.getElementById('placa').value = '';
+                
+                // Atualizar relatório
+                atualizarRelatorio();
             })
             .catch(error => {
-                console.error('Erro:', error);
-                alert('Erro ao gerar crachá!');
+                alert('Erro ao gerar crachá: ' + error);
             });
         }
         
@@ -512,263 +441,49 @@ HTML_TEMPLATE = '''
             fetch('/relatorio')
             .then(response => response.json())
             .then(data => {
-                const tbody = document.getElementById('relatorioBody');
+                const tbody = document.getElementById('corpo-tabela');
                 tbody.innerHTML = '';
                 
-                data.dados.forEach((item, index) => {
-                    const row = tbody.insertRow();
-                    row.innerHTML = `
+                data.forEach((item, index) => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
                         <td>${item.data_hora}</td>
-                        <td style="font-weight: 600;">${item.apartamento}</td>
-                        <td style="font-family: monospace;">${item.placa}</td>
-                        <td>
-                            <button class="btn btn-danger" onclick="excluirRegistro(${index})">
-                                🗑️ Excluir
-                            </button>
-                        </td>
+                        <td>${item.apartamento}</td>
+                        <td>${item.placa}</td>
+                        <td><button class="btn-excluir" onclick="excluirRegistro(${index})">🗑️ Excluir</button></td>
                     `;
+                    tbody.appendChild(tr);
                 });
                 
-                document.getElementById('totalRegistros').innerHTML = 
-                    `📊 Total de registros: ${data.total}`;
-            })
-            .catch(error => {
-                console.error('Erro ao carregar relatório:', error);
+                document.getElementById('total-registros').textContent = `📊 Total de registros: ${data.length}`;
             });
         }
         
         function excluirRegistro(index) {
-            if (confirm('Tem certeza que deseja excluir este registro?')) {
-                fetch('/excluir_cracha', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ index: index })
+            if (confirm('Deseja realmente excluir este registro?')) {
+                fetch(`/excluir/${index}`, {
+                    method: 'DELETE'
                 })
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
                         atualizarRelatorio();
                     }
-                })
-                .catch(error => {
-                    console.error('Erro ao excluir:', error);
                 });
             }
         }
         
         function exportarCSV() {
-            fetch('/relatorio')
-            .then(response => response.json())
-            .then(data => {
-                let csv = 'Data/Hora,Apartamento,Placa\\n';
-                data.dados.forEach(item => {
-                    csv += `${item.data_hora},${item.apartamento},${item.placa}\\n`;
-                });
-                
-                const blob = new Blob([csv], { type: 'text/csv' });
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `crachas_verte_${new Date().toISOString().split('T')[0]}.csv`;
-                a.click();
-                window.URL.revokeObjectURL(url);
-            });
-        }
-        
-        function testarQR() {
-            const apartamento = document.getElementById('apartamentoNumero').textContent;
-            const placa = document.getElementById('placa').value || 'TEST123';
-            window.open(`/placa/${placa}/${apartamento}`, '_blank');
-        }
-        
-        function imprimirCracha() {
-            const apartamento = document.getElementById('apartamentoNumero').textContent;
-            const qrUrl = document.getElementById('qrcode').src;
-            
-            const printWindow = window.open('', '_blank');
-            printWindow.document.write(`
-                <!DOCTYPE html>
-                <html>
-                <head>
-                    <title>Crachá ${apartamento}</title>
-                    <style>
-                        @page { size: 18cm 12cm; margin: 0; }
-                        body { margin: 0; padding: 0; font-family: Arial, sans-serif; }
-                        .print-container { 
-                            width: 18cm; height: 12cm; display: flex;
-                            page-break-after: always;
-                        }
-                        .cracha-frente, .cracha-verso { 
-                            width: 9cm; height: 12cm; padding: 1cm;
-                            display: flex; flex-direction: column; justify-content: center;
-                            background: white;
-                        }
-                        .apartamento-numero { 
-                            font-size: 48px; font-weight: 900; 
-                            color: #000; text-align: center; margin-bottom: 20px;
-                        }
-                        .logo-verte { 
-                            width: 130px; height: 130px; 
-                            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                            border-radius: 50%; margin: 15px auto;
-                            display: flex; flex-direction: column; align-items: center; justify-content: center;
-                            color: white; font-size: 28px; font-weight: 300;
-                        }
-                        .qr-code { width: 100px; height: 100px; margin: 15px auto; }
-                        .verso-titulo { 
-                            font-size: 16px; font-weight: 700; color: #667eea;
-                            text-align: center; margin-bottom: 20px;
-                        }
-                        .verso-instrucoes { 
-                            font-size: 12px; line-height: 1.6; color: #333;
-                        }
-                        .verso-instrucoes li { margin-bottom: 10px; }
-                        .linha-corte { 
-                            position: absolute; left: 9cm; top: 0; bottom: 0;
-                            width: 2px; border-left: 2px dashed #ccc;
-                        }
-                    </style>
-                </head>
-                <body>
-                    <div class="print-container">
-                        <div class="cracha-frente">
-                            <div class="apartamento-numero">${apartamento}</div>
-                            <div class="logo-verte">
-                                <div>verte</div>
-                                <div style="font-size: 14px;">Belém</div>
-                            </div>
-                            <img class="qr-code" src="${qrUrl}" alt="QR Code">
-                        </div>
-                        <div class="cracha-verso">
-                            <div class="verso-titulo">Instruções de Uso</div>
-                            <ul class="verso-instrucoes">
-                                <li>• Este crachá é individual e intransferível</li>
-                                <li>• Mantenha esta identificação pendurada no retrovisor interno</li>
-                                <li>• Extravio deve ser comunicado imediatamente</li>
-                                <li>• Alterações no cadastro devem ser informadas à Administração</li>
-                            </ul>
-                        </div>
-                        <div class="linha-corte"></div>
-                    </div>
-                </body>
-                </html>
-            `);
-            
-            printWindow.document.close();
-            setTimeout(() => {
-                printWindow.print();
-                printWindow.close();
-            }, 500);
+            window.location.href = '/exportar_csv';
         }
         
         // Carregar relatório ao iniciar
-        document.addEventListener('DOMContentLoaded', function() {
-            atualizarRelatorio();
-        });
+        atualizarRelatorio();
     </script>
 </body>
 </html>
 '''
 
-# Template da página de visualização de placa
-PLACA_TEMPLATE = '''
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Veículo {{ placa }} - Verte Belém</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { 
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh; display: flex; align-items: center; justify-content: center;
-            padding: 20px;
-        }
-        .container { 
-            background: white; border-radius: 20px; padding: 40px; text-align: center;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.2); max-width: 600px; width: 100%;
-        }
-        .header { 
-            color: #667eea; font-size: 28px; font-weight: 700;
-            margin-bottom: 30px;
-        }
-        .info-card { 
-            background: #f8f9fa; border-radius: 15px; padding: 25px; margin: 20px 0;
-            border-left: 5px solid #667eea;
-        }
-        .info-label { 
-            font-size: 14px; color: #666; margin-bottom: 8px;
-            text-transform: uppercase; letter-spacing: 1px;
-        }
-        .info-value { 
-            font-size: 32px; font-weight: 900; color: #333;
-            font-family: monospace;
-        }
-        .apartamento-value { 
-            font-size: 36px; font-weight: 900; color: #667eea;
-        }
-        .status-badge { 
-            background: #28a745; color: white; padding: 15px 25px; border-radius: 50px;
-            font-weight: 600; margin-top: 25px; display: inline-block;
-        }
-        .placa-mercosul {
-            width: 400px; height: 200px; margin: 30px auto;
-            background: linear-gradient(to bottom, #4169E1 0%, #4169E1 25%, #f5f5f5 25%, #f5f5f5 100%);
-            position: relative; border-radius: 15px;
-            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3);
-            border: 3px solid #333;
-        }
-        .placa-mercosul::before {
-            content: 'MERCOSUL'; position: absolute; top: 8px; left: 20px;
-            color: white; font-size: 14px; font-weight: bold;
-        }
-        .placa-mercosul::after {
-            content: 'BRASIL'; position: absolute; top: 8px; right: 80px;
-            color: white; font-size: 18px; font-weight: bold;
-        }
-        .placa-numero {
-            position: absolute; top: 58%; left: 50%;
-            transform: translate(-50%, -50%);
-            font-size: 48px; font-weight: 900; color: #000;
-            letter-spacing: 4px;
-        }
-        @media (max-width: 768px) {
-            .container { padding: 20px; }
-            .header { font-size: 22px; }
-            .info-value { font-size: 24px; }
-            .placa-mercosul { width: 300px; height: 150px; }
-            .placa-numero { font-size: 32px; }
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="header">🚗 Informações do Veículo</div>
-        
-        <div class="info-card">
-            <div class="info-label">PLACA:</div>
-            <div class="info-value">{{ placa }}</div>
-        </div>
-        
-        <div class="placa-mercosul">
-            <div class="placa-numero">{{ placa }}</div>
-        </div>
-        
-        <div class="info-card">
-            <div class="info-label">APARTAMENTO:</div>
-            <div class="apartamento-value">{{ apartamento }}</div>
-        </div>
-        
-        <div class="status-badge">
-            ✅ Veículo autorizado - Condomínio Verte Belém
-        </div>
-    </div>
-</body>
-</html>
-'''
-
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
+    port = int(os.environ.get('PORT', 8080))
     app.run(host='0.0.0.0', port=port, debug=False)

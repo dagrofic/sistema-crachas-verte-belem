@@ -125,6 +125,65 @@ def obter_logo_base64():
             return base64.b64encode(f.read()).decode()
     return ''
 
+def gerar_cracha_impressao(apartamento, qr_url="https://cracha.insuranceandreinsuranceapps.com"):
+    """Gera crachá de impressão no formato 765x1020 pixels (9x12cm)"""
+    # Dimensões do crachá (255x340 pts = ~765x1020 pixels em 300 DPI)
+    largura = 765
+    altura = 1020
+    
+    # Criar imagem branca
+    cracha = Image.new('RGB', (largura, altura), 'white')
+    draw = ImageDraw.Draw(cracha)
+    
+    # 1. NÚMERO DO APARTAMENTO (topo)
+    try:
+        fonte_apt = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 180)
+    except:
+        fonte_apt = ImageFont.load_default()
+    
+    # Calcular posição central do texto
+    bbox = draw.textbbox((0, 0), apartamento, font=fonte_apt)
+    text_width = bbox[2] - bbox[0]
+    x_apt = (largura - text_width) // 2
+    y_apt = 80
+    
+    draw.text((x_apt, y_apt), apartamento, fill='#2C3E50', font=fonte_apt)
+    
+    # 2. LOGO VERTE BELÉM (centro)
+    try:
+        logo = Image.open('logoverte.jpeg')
+        logo_size = 350
+        logo = logo.resize((logo_size, logo_size), Image.Resampling.LANCZOS)
+        
+        x_logo = (largura - logo_size) // 2
+        y_logo = 340
+        
+        cracha.paste(logo, (x_logo, y_logo))
+    except Exception as e:
+        print(f"Erro ao carregar logo: {e}")
+    
+    # 3. QR CODE (parte inferior)
+    qr = qrcode.QRCode(version=1, box_size=10, border=2)
+    qr.add_data(qr_url)
+    qr.make(fit=True)
+    qr_img = qr.make_image(fill_color="black", back_color="white")
+    
+    qr_size = 320
+    qr_img = qr_img.resize((qr_size, qr_size), Image.Resampling.LANCZOS)
+    
+    x_qr = (largura - qr_size) // 2
+    y_qr = 720
+    
+    cracha.paste(qr_img, (x_qr, y_qr))
+    
+    # Converter para base64
+    buffer = BytesIO()
+    cracha.save(buffer, format='PNG')
+    buffer.seek(0)
+    img_base64 = base64.b64encode(buffer.getvalue()).decode()
+    
+    return img_base64
+
 def obter_apartamentos():
     """Lista completa de 244 apartamentos - Verte Belém (Blocos A e B)"""
     # Números dos apartamentos conforme PDF oficial
@@ -177,6 +236,9 @@ def gerar_qr():
     # Gerar imagem da placa
     placa_imagem_base64 = gerar_imagem_placa(placa)
     
+    # Gerar crachá de impressão
+    cracha_impressao_base64 = gerar_cracha_impressao(apartamento)
+    
     # Salvar no arquivo JSON
     dados = carregar_dados()
     novo_cracha = {
@@ -191,7 +253,8 @@ def gerar_qr():
         'qr_code': qr_code_base64,
         'placa': placa.upper(),
         'placa_imagem': placa_imagem_base64,
-        'apartamento': apartamento
+        'apartamento': apartamento,
+        'cracha_impressao': cracha_impressao_base64
     })
 
 @app.route('/relatorio', methods=['GET'])
@@ -571,7 +634,10 @@ HTML_TEMPLATE = '''
                 </div>
             </div>
             
-            <button class="btn-imprimir" onclick="window.print()">🖨️ Imprimir Crachá</button>
+            <div style="display: flex; gap: 10px; justify-content: center;">
+                <button class="btn-imprimir" onclick="window.print()">🖨️ Imprimir Crachá</button>
+                <button class="btn-imprimir" onclick="baixarCrachaImpressao()" id="btn-download-cracha" style="background: #27ae60;">💾 Baixar Crachá para Corte</button>
+            </div>
         </div>
         
         <div class="relatorio">
@@ -634,6 +700,10 @@ HTML_TEMPLATE = '''
                 document.getElementById('placa-texto').textContent = data.placa;
                 document.getElementById('qr-code').src = 'data:image/png;base64,' + data.qr_code;
                 document.getElementById('placa-imagem').src = 'data:image/png;base64,' + data.placa_imagem;
+                
+                // Armazenar crachá de impressão para download
+                window.crachaImpressaoBase64 = data.cracha_impressao;
+                window.crachaApartamento = data.apartamento;
                 
                 // Mostrar resultado
                 document.getElementById('resultado').style.display = 'block';
@@ -703,6 +773,19 @@ HTML_TEMPLATE = '''
         
         function exportarCSV() {
             window.location.href = '/exportar_csv';
+        }
+        
+        function baixarCrachaImpressao() {
+            if (!window.crachaImpressaoBase64) {
+                alert('Gere um crachá primeiro!');
+                return;
+            }
+            
+            // Criar link de download
+            const link = document.createElement('a');
+            link.href = 'data:image/png;base64,' + window.crachaImpressaoBase64;
+            link.download = 'Cracha-' + window.crachaApartamento + '.png';
+            link.click();
         }
         
         // Carregar relatório ao iniciar

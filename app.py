@@ -96,13 +96,19 @@ def gerar_imagem_placa(placa_texto):
     draw.rectangle([(70, 72), (710, 220)], fill='white')
     
     # Desenhar cada caractere com espaçamento exato da placa original
-    x_inicial = 96  # Posição inicial X
+    x_pos = 96  # Posição inicial X
     y_posicao = 77   # Posição Y (vertical)
-    espacamento = 75  # Espaçamento entre caracteres (medido da placa original)
+    espacamento_letras = 75  # Espaçamento entre letras
+    espacamento_numeros = 85  # Espaçamento maior entre letras e números
     
     for i, char in enumerate(placa_texto):
-        x_char = x_inicial + (i * espacamento)
-        draw.text((x_char, y_posicao), char, fill='black', font=font)
+        draw.text((x_pos, y_posicao), char, fill='black', font=font)
+        
+        # Espaçamento diferente entre letras (ABC) e números (1D34)
+        if i == 2:  # Após a letra C (índice 2)
+            x_pos += espacamento_numeros  # Espaçamento maior antes do número
+        else:
+            x_pos += espacamento_letras  # Espaçamento normal
     
     # Converter para base64
     buffer = BytesIO()

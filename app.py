@@ -81,23 +81,22 @@ def gerar_imagem_placa(placa_texto):
         pass
     
     # Carregar fonte (usar fonte do sistema)
+    # Carregar fonte Liberation Sans Bold (tamanho exato da placa original)
     try:
-        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 130)
+        font = ImageFont.truetype("/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf", 140)
     except:
-        font = ImageFont.load_default()
+        try:
+            font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 140)
+        except:
+            font = ImageFont.load_default()
     
     # Apagar texto original da placa (área branca central)
-    # Coordenadas da área de texto: aproximadamente x=80 a x=700, y=70 a y=210
-    draw.rectangle([(80, 70), (700, 210)], fill='white')
+    draw.rectangle([(70, 60), (710, 220)], fill='white')
     
-    # Calcular posição para centralizar o texto
-    # Área útil da placa: largura ~620px (de x=80 a x=700)
-    # Altura útil: ~140px (de y=70 a y=210)
-    
-    # Desenhar cada caractere com espaçamento ajustado
+    # Desenhar cada caractere com espaçamento exato da placa original
     x_inicial = 95  # Posição inicial X
-    y_posicao = 85   # Posição Y (vertical)
-    espacamento = 75  # Espaçamento entre caracteres
+    y_posicao = 72   # Posição Y (vertical)
+    espacamento = 76  # Espaçamento entre caracteres (medido da placa original)
     
     for i, char in enumerate(placa_texto):
         x_char = x_inicial + (i * espacamento)

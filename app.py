@@ -65,33 +65,43 @@ def gerar_qr_code(placa, apartamento):
     return base64.b64encode(buffer.getvalue()).decode()
 
 def obter_apartamentos():
-    """Lista completa de 236 apartamentos - Verte Belém (Blocos A e B)"""
-    # Números dos apartamentos conforme PDF oficial
-    numeros = [
-        '006', '007', '011', '012', '013', '014', '015', '016', '017', '018',
-        '021', '022', '023', '024', '025', '026', '027', '028',
-        '031', '032', '033', '034', '035', '036', '037', '038',
-        '041', '042', '043', '044', '045', '046', '047', '048',
-        '051', '052', '053', '054', '055', '056', '057', '058',
-        '061', '062', '063', '064', '065', '066', '067', '068',
-        '071', '072', '073', '074', '075', '076', '077', '078',
-        '081', '082', '083', '084', '085', '086', '087', '088',
-        '091', '092', '093', '094', '095', '096', '097', '098',
-        '101', '102', '103', '104', '105', '106', '107', '108',
-        '111', '112', '113', '114', '115', '116', '117', '118',
-        '121', '122', '123', '124', '125', '126', '127', '128',
-        '131', '132', '133', '134', '135', '136', '137', '138',
-        '141', '142', '143', '144', '145', '146', '147', '148',
-        '151', '152', '153', '154', '155', '156', '157', '158'
+    """Lista completa de 242 apartamentos - Verte Belém (Blocos A e B) - Conforme PDF Oficial"""
+    # BLOCO A: 122 apartamentos (006A até 158A)
+    bloco_a = [
+        '006A', '007A', '011A', '012A', '013A', '014A', '015A', '016A', '017A', '018A',
+        '021A', '022A', '023A', '024A', '025A', '026A', '027A', '028A', '031A', '032A',
+        '033A', '034A', '035A', '036A', '037A', '038A', '041A', '042A', '043A', '044A',
+        '045A', '046A', '047A', '048A', '051A', '052A', '053A', '054A', '055A', '056A',
+        '057A', '058A', '061A', '062A', '063A', '064A', '065A', '066A', '067A', '068A',
+        '071A', '072A', '073A', '074A', '075A', '076A', '077A', '078A', '081A', '082A',
+        '083A', '084A', '085A', '086A', '087A', '088A', '091A', '092A', '093A', '094A',
+        '095A', '096A', '097A', '098A', '101A', '102A', '103A', '104A', '105A', '106A',
+        '107A', '108A', '111A', '112A', '113A', '114A', '115A', '116A', '117A', '118A',
+        '121A', '122A', '123A', '124A', '125A', '126A', '127A', '128A', '131A', '132A',
+        '133A', '134A', '135A', '136A', '137A', '138A', '141A', '142A', '143A', '144A',
+        '145A', '146A', '147A', '148A', '151A', '152A', '153A', '154A', '155A', '156A',
+        '157A', '158A'
     ]
     
-    apartamentos = []
-    # Gerar apartamentos para Bloco A e B em ordem
-    for num in numeros:
-        apartamentos.append(f'{num}A')
-        apartamentos.append(f'{num}B')
+    # BLOCO B: 120 apartamentos (006B até 158B, faltam 157B e 158B está duplicado no PDF como último)
+    bloco_b = [
+        '006B', '007B', '011B', '012B', '013B', '014B', '015B', '016B', '017B', '018B',
+        '021B', '022B', '023B', '024B', '025B', '026B', '027B', '028B', '031B', '032B',
+        '033B', '034B', '035B', '036B', '037B', '038B', '041B', '042B', '043B', '044B',
+        '045B', '046B', '047B', '048B', '051B', '052B', '053B', '054B', '055B', '056B',
+        '057B', '058B', '061B', '062B', '063B', '064B', '065B', '066B', '067B', '068B',
+        '071B', '072B', '073B', '074B', '075B', '076B', '077B', '078B', '081B', '082B',
+        '083B', '084B', '085B', '086B', '087B', '088B', '091B', '092B', '093B', '094B',
+        '095B', '096B', '097B', '098B', '101B', '102B', '103B', '104B', '105B', '106B',
+        '107B', '108B', '111B', '112B', '113B', '114B', '115B', '116B', '117B', '118B',
+        '121B', '122B', '123B', '124B', '125B', '126B', '127B', '128B', '131B', '132B',
+        '133B', '134B', '135B', '136B', '137B', '138B', '141B', '142B', '143B', '144B',
+        '145B', '146B', '147B', '148B', '151B', '152B', '153B', '154B', '155B', '156B',
+        '157B', '158B'
+    ]
     
-    return apartamentos
+    # Retornar lista completa em ordem
+    return bloco_a + bloco_b
 
 @app.route('/')
 def index():
@@ -160,7 +170,7 @@ HTML_TEMPLATE = '''
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema Final - Crachás Verte Belém</title>
+    <title>Sistema de Crachás - Verte Belém</title>
     <style>
         * {
             margin: 0;
@@ -315,29 +325,23 @@ HTML_TEMPLATE = '''
         
         .btn-excluir {
             background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-            padding: 6px 12px;
-            font-size: 12px;
+            padding: 8px 16px;
+            font-size: 14px;
             width: auto;
-            margin: 0;
+            cursor: pointer;
         }
         
-        .total {
-            text-align: center;
-            margin-top: 15px;
-            padding: 15px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border-radius: 8px;
-            font-weight: 600;
+        .btn-excluir:hover {
+            transform: translateY(-1px);
         }
         
-        @media (max-width: 600px) {
+        @media (max-width: 768px) {
             .container {
                 padding: 20px;
             }
             
             h1 {
-                font-size: 22px;
+                font-size: 24px;
             }
             
             table {
@@ -345,136 +349,155 @@ HTML_TEMPLATE = '''
             }
             
             th, td {
-                padding: 8px;
+                padding: 10px;
             }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🏢 Sistema Final - Crachás Verte Belém</h1>
+        <h1>🚗 Sistema de Crachás Veiculares<br>Condomínio Verte Belém</h1>
         
-        <div class="form-group">
-            <label for="apartamento">🏠 Apartamento:</label>
-            <select id="apartamento" required>
-                <option value="">Selecione o apartamento</option>
-                {{ apartamentos_options|safe }}
-            </select>
-        </div>
-        
-        <div class="form-group">
-            <label for="placa">🚗 Placa do Veículo:</label>
-            <input type="text" id="placa" placeholder="Ex: ABC1D34 ou ABC-1234" required>
-            <div class="format-hint">Formatos aceitos: ABC1D34 (Mercosul) ou ABC-1234 (Antigo)</div>
-        </div>
-        
-        <button onclick="gerarCracha()">🎫 Gerar Crachá</button>
+        <form id="crachaForm">
+            <div class="form-group">
+                <label for="apartamento">Apartamento (242 unidades - Blocos A e B)</label>
+                <select id="apartamento" name="apartamento" required>
+                    <option value="">Selecione o apartamento</option>
+                    {{ apartamentos_options|safe }}
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="placa">Placa do Veículo</label>
+                <input type="text" id="placa" name="placa" placeholder="ABC1D23 ou ABC-1234" required>
+                <div class="format-hint">Formatos aceitos: Mercosul (ABC1D23) ou Antigo (ABC-1234)</div>
+            </div>
+            
+            <button type="submit">Gerar Crachá com QR Code</button>
+        </form>
         
         <div id="resultado">
             <h2>✅ Crachá Gerado com Sucesso!</h2>
+            <p><strong>Apartamento:</strong> <span id="resultApt"></span></p>
+            <p><strong>Placa:</strong> <span id="resultPlaca"></span></p>
             <img id="qrcode" src="" alt="QR Code">
-            <p><strong>Apartamento:</strong> <span id="apt-resultado"></span></p>
-            <p><strong>Placa:</strong> <span id="placa-resultado"></span></p>
+            <button onclick="imprimirQRCode()">🖨️ Imprimir Crachá</button>
         </div>
         
         <div class="relatorio">
             <h2>
-                📊 Relatório de Crachás
+                📋 Relatório de Crachás
                 <div class="btn-group">
-                    <button class="btn-secondary" onclick="atualizarRelatorio()">🔄 Atualizar Relatório</button>
-                    <button class="btn-secondary" onclick="exportarCSV()">📄 Exportar CSV</button>
+                    <button class="btn-secondary" onclick="atualizarRelatorio()">🔄 Atualizar</button>
+                    <button class="btn-secondary" onclick="exportarCSV()">📥 Exportar CSV</button>
                 </div>
             </h2>
-            <table id="tabela-relatorio">
+            <table id="tabelaRelatorio">
                 <thead>
                     <tr>
                         <th>Data/Hora</th>
                         <th>Apartamento</th>
                         <th>Placa</th>
-                        <th>Ações</th>
+                        <th>Ação</th>
                     </tr>
                 </thead>
-                <tbody id="corpo-tabela">
+                <tbody id="corpoTabela">
+                    <tr>
+                        <td colspan="4" style="text-align: center;">Carregando...</td>
+                    </tr>
                 </tbody>
             </table>
-            <div class="total" id="total-registros"></div>
         </div>
     </div>
     
     <script>
-        function gerarCracha() {
+        document.getElementById('crachaForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
             const apartamento = document.getElementById('apartamento').value;
-            const placa = document.getElementById('placa').value;
+            const placa = document.getElementById('placa').value.toUpperCase();
             
-            if (!apartamento || !placa) {
-                alert('Por favor, preencha todos os campos!');
-                return;
+            try {
+                const response = await fetch('/gerar_qr', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ apartamento, placa })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    document.getElementById('resultApt').textContent = data.apartamento;
+                    document.getElementById('resultPlaca').textContent = data.placa;
+                    document.getElementById('qrcode').src = 'data:image/png;base64,' + data.qr_code;
+                    document.getElementById('resultado').style.display = 'block';
+                    
+                    // Atualizar relatório
+                    atualizarRelatorio();
+                    
+                    // Limpar formulário
+                    document.getElementById('crachaForm').reset();
+                } else {
+                    alert('Erro: ' + data.error);
+                }
+            } catch (error) {
+                alert('Erro ao gerar crachá: ' + error.message);
             }
-            
-            fetch('/gerar_qr', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ apartamento, placa })
-            })
-            .then(response => response.json())
-            .then(data => {
-                document.getElementById('qrcode').src = 'data:image/png;base64,' + data.qr_code;
-                document.getElementById('apt-resultado').textContent = data.apartamento;
-                document.getElementById('placa-resultado').textContent = data.placa;
-                document.getElementById('resultado').style.display = 'block';
-                
-                // Limpar formulário
-                document.getElementById('apartamento').value = '';
-                document.getElementById('placa').value = '';
-                
-                // Atualizar relatório
-                atualizarRelatorio();
-            })
-            .catch(error => {
-                alert('Erro ao gerar crachá: ' + error);
-            });
-        }
+        });
         
-        function atualizarRelatorio() {
-            fetch('/relatorio')
-            .then(response => response.json())
-            .then(data => {
-                const tbody = document.getElementById('corpo-tabela');
+        async function atualizarRelatorio() {
+            try {
+                const response = await fetch('/relatorio');
+                const dados = await response.json();
+                
+                const tbody = document.getElementById('corpoTabela');
                 tbody.innerHTML = '';
                 
-                data.forEach((item, index) => {
-                    const tr = document.createElement('tr');
-                    tr.innerHTML = `
-                        <td>${item.data_hora}</td>
-                        <td>${item.apartamento}</td>
-                        <td>${item.placa}</td>
-                        <td><button class="btn-excluir" onclick="excluirRegistro(${index})">🗑️ Excluir</button></td>
-                    `;
-                    tbody.appendChild(tr);
-                });
-                
-                document.getElementById('total-registros').textContent = `📊 Total de registros: ${data.length}`;
-            });
+                if (dados.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="4" style="text-align: center;">Nenhum crachá cadastrado</td></tr>';
+                } else {
+                    dados.reverse().forEach((item, index) => {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td>${item.data_hora}</td>
+                            <td>${item.apartamento}</td>
+                            <td>${item.placa}</td>
+                            <td><button class="btn-excluir" onclick="excluirCracha(${dados.length - 1 - index})">🗑️ Excluir</button></td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                }
+            } catch (error) {
+                console.error('Erro ao carregar relatório:', error);
+            }
         }
         
-        function excluirRegistro(index) {
-            if (confirm('Deseja realmente excluir este registro?')) {
-                fetch(`/excluir/${index}`, {
-                    method: 'DELETE'
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
+        async function excluirCracha(index) {
+            if (confirm('Tem certeza que deseja excluir este crachá?')) {
+                try {
+                    const response = await fetch(`/excluir/${index}`, {
+                        method: 'DELETE'
+                    });
+                    
+                    if (response.ok) {
                         atualizarRelatorio();
+                    } else {
+                        alert('Erro ao excluir crachá');
                     }
-                });
+                } catch (error) {
+                    alert('Erro: ' + error.message);
+                }
             }
         }
         
         function exportarCSV() {
             window.location.href = '/exportar_csv';
+        }
+        
+        function imprimirQRCode() {
+            window.print();
         }
         
         // Carregar relatório ao iniciar
@@ -486,4 +509,4 @@ HTML_TEMPLATE = '''
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
-    app.run(host='0.0.0.0', port=port, debug=False)
+    app.run(host='0.0.0.0', port=port)

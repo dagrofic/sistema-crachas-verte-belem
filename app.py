@@ -135,9 +135,27 @@ def gerar_cracha_impressao(apartamento, qr_url="https://cracha.insuranceandreins
     cracha = Image.new('RGB', (largura, altura), 'white')
     draw = ImageDraw.Draw(cracha)
     
-    # 1. NÚMERO DO APARTAMENTO (topo) - GRANDE E VISÍVEL DE LONGE
+    # 1. NÚMERO DO APARTAMENTO (topo) - ALINHADO COM O LOGO
+    # Ajustar fonte para que o número tenha a mesma largura do logo (320px)
     try:
-        fonte_apt = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 280)
+        largura_maxima_numero = 320
+        tamanho_fonte = 300  # Começar grande
+        
+        # Reduzir fonte até caber na largura máxima
+        for tentativa in range(100):
+            fonte_apt = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", tamanho_fonte)
+            bbox = draw.textbbox((0, 0), apartamento, font=fonte_apt)
+            text_width = bbox[2] - bbox[0]
+            
+            if text_width <= largura_maxima_numero:
+                break
+            
+            tamanho_fonte -= 2
+            
+            if tamanho_fonte < 50:
+                break
+        
+        print(f"Apartamento {apartamento}: fonte {tamanho_fonte}px, largura {text_width}px")
     except:
         fonte_apt = ImageFont.load_default()
     
@@ -146,35 +164,36 @@ def gerar_cracha_impressao(apartamento, qr_url="https://cracha.insuranceandreins
     text_width = bbox[2] - bbox[0]
     text_height = bbox[3] - bbox[1]
     x_apt = (largura - text_width) // 2
-    y_apt = 40
+    y_apt = 80
     
     draw.text((x_apt, y_apt), apartamento, fill='black', font=fonte_apt)
     
-    # 2. LOGO VERTE BELÉM (centro) - GRANDE E ALTA QUALIDADE
+    # 2. LOGO VERTE BELÉM (centro) - MESMO TAMANHO DO NÚMERO
     try:
         logo = Image.open('logoverte.jpeg')
-        logo_size = 310
+        logo_size = 320  # Mesmo tamanho da largura máxima do número
         logo = logo.resize((logo_size, logo_size), Image.Resampling.LANCZOS)
         
         x_logo = (largura - logo_size) // 2
-        y_logo = y_apt + text_height + 70  # Espaçamento maior para evitar sobreposição
+        y_logo = y_apt + text_height + 60
         
         cracha.paste(logo, (x_logo, y_logo))
     except Exception as e:
         print(f"Erro ao carregar logo: {e}")
-        y_logo = 322
+        logo_size = 320
+        y_logo = 400
     
-    # 3. QR CODE (parte inferior) - GRANDE
+    # 3. QR CODE (parte inferior) - PROPORCIONAL AO LOGO
     qr = qrcode.QRCode(version=1, box_size=10, border=2)
     qr.add_data(qr_url)
     qr.make(fit=True)
     qr_img = qr.make_image(fill_color="black", back_color="white")
     
-    qr_size = 250
+    qr_size = 288  # 90% do tamanho do logo
     qr_img = qr_img.resize((qr_size, qr_size), Image.Resampling.LANCZOS)
     
     x_qr = (largura - qr_size) // 2
-    y_qr = y_logo + logo_size + 60  # Espaçamento adequado
+    y_qr = y_logo + logo_size + 50
     
     cracha.paste(qr_img, (x_qr, y_qr))
     

@@ -135,9 +135,9 @@ def gerar_cracha_impressao(apartamento, qr_url="https://cracha.insuranceandreins
     cracha = Image.new('RGB', (largura, altura), 'white')
     draw = ImageDraw.Draw(cracha)
     
-    # 1. NÚMERO DO APARTAMENTO (topo) - GRANDE E BOLD
+    # 1. NÚMERO DO APARTAMENTO (topo) - GIGANTE
     try:
-        fonte_apt = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 120)
+        fonte_apt = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 180)
     except:
         fonte_apt = ImageFont.load_default()
     
@@ -145,18 +145,18 @@ def gerar_cracha_impressao(apartamento, qr_url="https://cracha.insuranceandreins
     bbox = draw.textbbox((0, 0), apartamento, font=fonte_apt)
     text_width = bbox[2] - bbox[0]
     x_apt = (largura - text_width) // 2
-    y_apt = 80
+    y_apt = 60
     
     draw.text((x_apt, y_apt), apartamento, fill='black', font=fonte_apt)
     
-    # 2. LOGO VERTE BELÉM (centro) - MÉDIO
+    # 2. LOGO VERTE BELÉM (centro) - GRANDE E ALTA QUALIDADE
     try:
         logo = Image.open('logoverte.jpeg')
-        logo_size = 350
+        logo_size = 420
         logo = logo.resize((logo_size, logo_size), Image.Resampling.LANCZOS)
         
         x_logo = (largura - logo_size) // 2
-        y_logo = 280
+        y_logo = 310
         
         cracha.paste(logo, (x_logo, y_logo))
     except Exception as e:
@@ -172,7 +172,7 @@ def gerar_cracha_impressao(apartamento, qr_url="https://cracha.insuranceandreins
     qr_img = qr_img.resize((qr_size, qr_size), Image.Resampling.LANCZOS)
     
     x_qr = (largura - qr_size) // 2
-    y_qr = 680
+    y_qr = 720
     
     cracha.paste(qr_img, (x_qr, y_qr))
     

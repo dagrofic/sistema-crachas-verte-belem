@@ -135,32 +135,34 @@ def gerar_cracha_impressao(apartamento, qr_url="https://cracha.insuranceandreins
     cracha = Image.new('RGB', (largura, altura), 'white')
     draw = ImageDraw.Draw(cracha)
     
-    # 1. NÚMERO DO APARTAMENTO (topo) - GIGANTE
+    # 1. NÚMERO DO APARTAMENTO (topo) - EXTRA GRANDE
     try:
-        fonte_apt = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 180)
+        fonte_apt = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 250)
     except:
         fonte_apt = ImageFont.load_default()
     
     # Calcular posição central do texto
     bbox = draw.textbbox((0, 0), apartamento, font=fonte_apt)
     text_width = bbox[2] - bbox[0]
+    text_height = bbox[3] - bbox[1]
     x_apt = (largura - text_width) // 2
-    y_apt = 60
+    y_apt = 40
     
     draw.text((x_apt, y_apt), apartamento, fill='black', font=fonte_apt)
     
     # 2. LOGO VERTE BELÉM (centro) - GRANDE E ALTA QUALIDADE
     try:
         logo = Image.open('logoverte.jpeg')
-        logo_size = 420
+        logo_size = 360
         logo = logo.resize((logo_size, logo_size), Image.Resampling.LANCZOS)
         
         x_logo = (largura - logo_size) // 2
-        y_logo = 310
+        y_logo = y_apt + text_height + 50
         
         cracha.paste(logo, (x_logo, y_logo))
     except Exception as e:
         print(f"Erro ao carregar logo: {e}")
+        y_logo = 280
     
     # 3. QR CODE (parte inferior) - GRANDE
     qr = qrcode.QRCode(version=1, box_size=10, border=2)
@@ -168,11 +170,11 @@ def gerar_cracha_impressao(apartamento, qr_url="https://cracha.insuranceandreins
     qr.make(fit=True)
     qr_img = qr.make_image(fill_color="black", back_color="white")
     
-    qr_size = 280
+    qr_size = 260
     qr_img = qr_img.resize((qr_size, qr_size), Image.Resampling.LANCZOS)
     
     x_qr = (largura - qr_size) // 2
-    y_qr = 720
+    y_qr = y_logo + 360 + 40
     
     cracha.paste(qr_img, (x_qr, y_qr))
     

@@ -135,9 +135,9 @@ def gerar_cracha_impressao(apartamento, qr_url="https://cracha.insuranceandreins
     cracha = Image.new('RGB', (largura, altura), 'white')
     draw = ImageDraw.Draw(cracha)
     
-    # 1. NÚMERO DO APARTAMENTO (topo) - EXTRA GRANDE
+    # 1. NÚMERO DO APARTAMENTO (topo) - BEM GRANDE E VISÍVEL
     try:
-        fonte_apt = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 250)
+        fonte_apt = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 320)
     except:
         fonte_apt = ImageFont.load_default()
     
@@ -146,23 +146,23 @@ def gerar_cracha_impressao(apartamento, qr_url="https://cracha.insuranceandreins
     text_width = bbox[2] - bbox[0]
     text_height = bbox[3] - bbox[1]
     x_apt = (largura - text_width) // 2
-    y_apt = 40
+    y_apt = 30
     
     draw.text((x_apt, y_apt), apartamento, fill='black', font=fonte_apt)
     
     # 2. LOGO VERTE BELÉM (centro) - GRANDE E ALTA QUALIDADE
     try:
         logo = Image.open('logoverte.jpeg')
-        logo_size = 360
+        logo_size = 330
         logo = logo.resize((logo_size, logo_size), Image.Resampling.LANCZOS)
         
         x_logo = (largura - logo_size) // 2
-        y_logo = y_apt + text_height + 50
+        y_logo = y_apt + text_height + 40
         
         cracha.paste(logo, (x_logo, y_logo))
     except Exception as e:
         print(f"Erro ao carregar logo: {e}")
-        y_logo = 280
+        y_logo = 313
     
     # 3. QR CODE (parte inferior) - GRANDE
     qr = qrcode.QRCode(version=1, box_size=10, border=2)
@@ -170,11 +170,11 @@ def gerar_cracha_impressao(apartamento, qr_url="https://cracha.insuranceandreins
     qr.make(fit=True)
     qr_img = qr.make_image(fill_color="black", back_color="white")
     
-    qr_size = 260
+    qr_size = 240
     qr_img = qr_img.resize((qr_size, qr_size), Image.Resampling.LANCZOS)
     
     x_qr = (largura - qr_size) // 2
-    y_qr = y_logo + 360 + 40
+    y_qr = y_logo + 330 + 35
     
     cracha.paste(qr_img, (x_qr, y_qr))
     

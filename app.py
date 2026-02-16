@@ -7,6 +7,7 @@ from datetime import datetime
 from PIL import Image, ImageDraw, ImageFont
 import json
 import os
+import re
 
 app = Flask(__name__)
 CORS(app)
@@ -147,10 +148,12 @@ def gerar_cracha_impressao(apartamento, qr_url="https://cracha.insuranceandreins
         # Fonte 250px - largura 715px (93.5% do crachá), altura 190px
         tamanho_fonte = 250
         fonte_apt = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", tamanho_fonte)
-        
-        print(f"Apartamento {apartamento}: fonte {tamanho_fonte}px")
     except:
-        fonte_apt = ImageFont.load_default()
+        try:
+            # Fallback: Liberation Sans Bold (do repositório)
+            fonte_apt = ImageFont.truetype("LiberationSans-Bold.ttf", 240)
+        except:
+            fonte_apt = ImageFont.load_default()
     
     # Calcular posição central do texto
     bbox = draw.textbbox((0, 0), apartamento, font=fonte_apt)
@@ -238,11 +241,15 @@ def index():
 @app.route('/gerar_qr', methods=['POST'])
 def gerar_qr():
     data = request.get_json()
-    placa = data.get('placa')
+    placa = data.get('placa', '').upper().replace('-', '')
     apartamento = data.get('apartamento')
     
     if not placa or not apartamento:
         return jsonify({'error': 'Placa e apartamento são obrigatórios'}), 400
+    
+    # Validação básica de formato de placa
+    if not re.match(r'^[A-Z]{3}[0-9][A-Z][0-9]{2}$|^[A-Z]{3}[0-9]{4}$', placa):
+        return jsonify({'error': 'Formato de placa inválido. Use ABC1D34 ou ABC1234'}), 400
     
     # Gerar QR code
     qr_code_base64 = gerar_qr_code(placa, apartamento)
@@ -821,108 +828,4 @@ VISUALIZACAO_TEMPLATE = '''
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Crachá Veicular - {{ apartamento }}</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            padding: 20px;
-        }
-        
-        .cracha-container {
-            background: white;
-            border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-            padding: 40px;
-            max-width: 600px;
-            width: 100%;
-            text-align: center;
-        }
-        
-        .logo {
-            max-width: 150px;
-            margin-bottom: 20px;
-        }
-        
-        h1 {
-            color: #667eea;
-            margin-bottom: 10px;
-            font-size: 24px;
-        }
-        
-        .apartamento {
-            font-size: 48px;
-            font-weight: bold;
-            color: #667eea;
-            margin: 20px 0;
-        }
-        
-        .placa-imagem {
-            margin: 30px 0;
-        }
-        
-        .placa-imagem img {
-            max-width: 100%;
-            height: auto;
-            border-radius: 10px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
-        }
-        
-        .info {
-            background: #f5f5f5;
-            padding: 20px;
-            border-radius: 10px;
-            margin-top: 20px;
-        }
-        
-        .info p {
-            margin: 10px 0;
-            color: #333;
-            font-size: 16px;
-        }
-        
-        .data-hora {
-            color: #666;
-            font-size: 14px;
-            margin-top: 20px;
-        }
-    </style>
-</head>
-<body>
-    <div class="cracha-container">
-        {% if logo_base64 %}
-        <img src="data:image/jpeg;base64,{{ logo_base64 }}" alt="Logo Verte Belém" class="logo">
-        {% endif %}
-        
-        <h1>Condomínio Verte Belém</h1>
-        
-        <div class="apartamento">Apartamento {{ apartamento }}</div>
-        
-        <div class="placa-imagem">
-            <img src="data:image/png;base64,{{ placa_imagem_base64 }}" alt="Placa {{ placa }}">
-        </div>
-        
-        <div class="info">
-            <p><strong>Placa:</strong> {{ placa }}</p>
-            <p><strong>Apartamento:</strong> {{ apartamento }}</p>
-            <p class="data-hora">Registrado em: {{ data_hora }}</p>
-        </div>
-    </div>
-</body>
-</html>
-'''
-
-if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=True)
+    <meta name="viewport" content="width=device-width, initial-scale

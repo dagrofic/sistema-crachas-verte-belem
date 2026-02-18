@@ -52,7 +52,7 @@ def salvar_dados(dados):
 
 def gerar_qr_code(placa, apartamento):
     """Gera QR code para a placa"""
-    base_url = os.environ.get('BASE_URL', 'https://crachaverte.insuranceandreinsuranceapps.com')
+    base_url = os.environ.get('BASE_URL', 'https://sistema-crachas-verte-belem.onrender.com')
     url = f"{base_url}/placa/{placa}/{apartamento}"
     
     qr = qrcode.QRCode(version=1, box_size=10, border=5)
@@ -118,8 +118,8 @@ def obter_logo_base64():
             return base64.b64encode(f.read()).decode()
     return ''
 
-def gerar_cracha_impressao(apartamento, qr_url="https://crachaverte.insuranceandreinsuranceapps.com"):
-    """Gera crachá de impressão FRENTE (21.5cm x 9.5cm) - Exatamente como PDF Crachá-011A.pdf"""
+def gerar_cracha_frente(apartamento, qr_url):
+    """Gera crachá FRENTE (21.5cm x 9.5cm) - Exatamente como PDF Crachá-011A.pdf"""
     # Dimensões em pixels para 21.5cm x 9.5cm (300 DPI)
     largura = 2550  # 21.5cm
     altura = 1134   # 9.5cm
@@ -127,11 +127,14 @@ def gerar_cracha_impressao(apartamento, qr_url="https://crachaverte.insuranceand
     cracha = Image.new('RGB', (largura, altura), 'white')
     draw = ImageDraw.Draw(cracha)
     
-    # 1. NÚMERO DO APARTAMENTO (topo, centralizado)
+    # 1. NÚMERO DO APARTAMENTO (topo, centralizado, PRETO GRANDE)
     try:
         fonte_apt = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 400)
     except:
-        fonte_apt = ImageFont.load_default()
+        try:
+            fonte_apt = ImageFont.truetype("LiberationSans-Bold.ttf", 400)
+        except:
+            fonte_apt = ImageFont.load_default()
     
     bbox = draw.textbbox((0, 0), apartamento, font=fonte_apt)
     text_width = bbox[2] - bbox[0]
@@ -139,13 +142,13 @@ def gerar_cracha_impressao(apartamento, qr_url="https://crachaverte.insuranceand
     y_apt = 80
     draw.text((x_apt, y_apt), apartamento, fill='black', font=fonte_apt)
     
-    # 2. LOGO VERTE BELÉM (centro, círculo vermelho)
+    # 2. LOGO VERTE BELÉM (centro)
     try:
         logo = Image.open('logoverte.jpeg')
         logo_size = 600
         logo = logo.resize((logo_size, logo_size), Image.Resampling.LANCZOS)
         x_logo = (largura - logo_size) // 2
-        y_logo = (altura - logo_size) // 2 - 100
+        y_logo = (altura - logo_size) // 2 - 50
         cracha.paste(logo, (x_logo, y_logo))
     except Exception as e:
         print(f"Erro ao carregar logo: {e}")
@@ -169,7 +172,7 @@ def gerar_cracha_impressao(apartamento, qr_url="https://crachaverte.insuranceand
     
     return img_base64
 
-def gerar_cracha_verso(apartamento, qr_url="https://crachaverte.insuranceandreinsuranceapps.com"):
+def gerar_cracha_verso(apartamento, qr_url):
     """Gera verso do crachá com instruções - Exatamente como PDF CracháPremium-143B.pdf"""
     # Dimensões em pixels para 21.5cm x 9.5cm (300 DPI)
     largura = 2550  # 21.5cm
@@ -307,9 +310,12 @@ def gerar_qr():
     if not re.match(r'^[A-Z]{3}[0-9][A-Z][0-9]{2}$|^[A-Z]{3}[0-9]{4}$', placa):
         return jsonify({'error': 'Formato de placa inválido. Use ABC1D34 ou ABC1234'}), 400
     
+    qr_url = f"{os.environ.get('BASE_URL', 'https://sistema-crachas-verte-belem.onrender.com')}/placa/{placa}/{apartamento}"
+    
     qr_code_base64 = gerar_qr_code(placa, apartamento)
     placa_imagem_base64 = gerar_imagem_placa(placa)
-    cracha_impressao_base64 = gerar_cracha_impressao(apartamento)
+    cracha_frente_base64 = gerar_cracha_frente(apartamento, qr_url)
+    cracha_verso_base64 = gerar_cracha_verso(apartamento, qr_url)
     
     dados = carregar_dados()
     novo_cracha = {
@@ -325,7 +331,8 @@ def gerar_qr():
         'placa': placa.upper(),
         'placa_imagem': placa_imagem_base64,
         'apartamento': apartamento,
-        'cracha_impressao': cracha_impressao_base64
+        'cracha_frente': cracha_frente_base64,
+        'cracha_verso': cracha_verso_base64
     })
 
 @app.route('/relatorio', methods=['GET'])
@@ -476,20 +483,12 @@ HTML_TEMPLATE = '''
             margin: 0;
         }
         .total { text-align: center; margin-top: 15px; padding: 15px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 8px; font-weight: 600; }
-        
         @media print {
             body { background: white; }
-            .container { box-shadow: none; padding: 0; }
-            .form-group, .relatorio, button:not(.btn-imprimir) { display: none !important; }
-            #resultado { display: block !important; }
-            .btn-imprimir { display: none !important; }
-        }
-        
-        @media (max-width: 600px) {
-            .container { padding: 20px; }
-            h1 { font-size: 22px; }
-            table { font-size: 14px; }
-            th, td { padding: 8px; }
+            .container { box-shadow: none; padding: 0; max-width: 100%; }
+            .form-group, .relatorio, .btn-imprimir, button { display: none; }
+            #resultado { display: block; margin: 0; }
+            .cracha { border: none; box-shadow: none; padding: 0; page-break-inside: avoid; }
         }
     </style>
 </head>
@@ -500,186 +499,148 @@ HTML_TEMPLATE = '''
             <img src="data:image/jpeg;base64,{{ logo_base64 }}" alt="Logo Verte Belém">
             {% endif %}
             <h1>Sistema de Crachás Veiculares</h1>
-            <div class="subtitle">Condomínio Verte Belém - 244 Apartamentos</div>
+            <p class="subtitle">Condomínio Verte Belém - 244 Apartamentos</p>
         </div>
-        
+
         <div class="form-group">
             <label for="apartamento">Apartamento:</label>
-            <select id="apartamento" name="apartamento">
-                {{ apartamentos_options|safe }}
+            <select id="apartamento">
+                <option value="">Selecione um apartamento...</option>
+                {{ apartamentos_options }}
             </select>
         </div>
-        
+
         <div class="form-group">
-            <label for="placa">Placa do Veículo:</label>
-            <input type="text" id="placa" name="placa" placeholder="ABC1D34 ou ABC-1234" maxlength="8">
-            <div class="format-hint">Formatos aceitos: Mercosul (ABC1D34) ou Antigo (ABC-1234)</div>
+            <label for="placa">Placa Veicular (Mercosul):</label>
+            <input type="text" id="placa" placeholder="ABC1D34" maxlength="7">
+            <div class="format-hint">Formato: ABC1D34 (3 letras + 1 número + 1 letra + 2 números)</div>
         </div>
-        
-        <button onclick="gerarCracha()">Gerar Crachá</button>
-        
+
+        <button onclick="gerarCracha()">🎫 Gerar Crachá</button>
+
         <div id="resultado">
-            <div class="cracha" id="cracha-print">
+            <div class="cracha">
                 <div class="cracha-header">
                     {% if logo_base64 %}
                     <img src="data:image/jpeg;base64,{{ logo_base64 }}" alt="Logo Verte Belém">
                     {% endif %}
-                    <div class="cracha-apartamento">Apartamento: <span id="apt-numero"></span></div>
                 </div>
-                
+                <div class="cracha-apartamento" id="apartamentoDisplay"></div>
                 <div class="cracha-placa-img">
-                    <img id="placa-imagem" src="" alt="Placa do Veículo">
+                    <img id="placaImg" src="" alt="Placa">
                 </div>
-                
                 <div class="cracha-qr">
-                    <img id="qr-code" src="" alt="QR Code">
+                    <img id="qrCodeImg" src="" alt="QR Code">
                 </div>
-                
                 <div class="cracha-info">
-                    <p><strong>Placa:</strong> <span id="placa-texto"></span></p>
-                    <p><strong>Escaneie o QR Code para verificar</strong></p>
+                    <p>Placa: <strong id="placaDisplay"></strong></p>
+                    <p>Escaneie o QR Code para verificar</p>
                 </div>
             </div>
-            
-            <div style="display: flex; gap: 10px; justify-content: center;">
-                <button class="btn-imprimir" onclick="window.print()">🖨️ Imprimir Crachá</button>
-                <button class="btn-imprimir" onclick="baixarCrachaImpressao()" id="btn-download-cracha" style="background: #27ae60;">💾 Baixar Crachá para Corte</button>
-            </div>
+            <button class="btn-imprimir" onclick="window.print()">🖨️ Imprimir Crachá</button>
         </div>
-        
+
         <div class="relatorio">
             <h2>
-                <span>Crachás Gerados</span>
+                📋 Relatório de Crachás
                 <div class="btn-group">
-                    <button class="btn-secondary" onclick="carregarRelatorio()">🔄 Atualizar</button>
-                    <button class="btn-secondary" onclick="exportarCSV()">📥 Exportar CSV</button>
+                    <button class="btn-secondary" onclick="atualizarRelatorio()">📋 Atualizar Relatório</button>
+                    <button class="btn-secondary" onclick="exportarCSV()">📄 Exportar Excel</button>
                 </div>
             </h2>
-            
-            <table id="tabela-relatorio">
+            <table id="tabelaRelatorio">
                 <thead>
                     <tr>
                         <th>Data/Hora</th>
                         <th>Apartamento</th>
                         <th>Placa</th>
-                        <th>Ações</th>
+                        <th>Ação</th>
                     </tr>
                 </thead>
-                <tbody id="corpo-tabela">
-                    <tr><td colspan="4" style="text-align: center;">Carregando...</td></tr>
-                </tbody>
+                <tbody id="tabelaCorpo"></tbody>
             </table>
-            
-            <div class="total" id="total-crachas">Total: 0 crachás</div>
+            <div class="total" id="totalCrachas"></div>
         </div>
     </div>
-    
+
     <script>
-        async function gerarCracha() {
+        function gerarCracha() {
             const apartamento = document.getElementById('apartamento').value;
-            const placa = document.getElementById('placa').value.trim();
-            
-            if (!placa) {
-                alert('Por favor, informe a placa do veículo');
+            const placa = document.getElementById('placa').value;
+
+            if (!apartamento || !placa) {
+                alert('Por favor, preencha todos os campos');
                 return;
             }
-            
-            try {
-                const response = await fetch('/gerar_qr', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ placa, apartamento })
-                });
-                
-                const data = await response.json();
-                
+
+            fetch('/gerar_qr', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ apartamento, placa })
+            })
+            .then(r => r.json())
+            .then(data => {
                 if (data.error) {
-                    alert(data.error);
+                    alert('Erro: ' + data.error);
                     return;
                 }
-                
-                document.getElementById('apt-numero').textContent = data.apartamento;
-                document.getElementById('placa-texto').textContent = data.placa;
-                document.getElementById('qr-code').src = 'data:image/png;base64,' + data.qr_code;
-                document.getElementById('placa-imagem').src = 'data:image/png;base64,' + data.placa_imagem;
-                
-                window.crachaImpressaoBase64 = data.cracha_impressao;
-                window.crachaApartamento = data.apartamento;
-                
+                document.getElementById('apartamentoDisplay').textContent = apartamento;
+                document.getElementById('placaDisplay').textContent = data.placa;
+                document.getElementById('placaImg').src = 'data:image/png;base64,' + data.placa_imagem;
+                document.getElementById('qrCodeImg').src = 'data:image/png;base64,' + data.qr_code;
                 document.getElementById('resultado').style.display = 'block';
-                carregarRelatorio();
-                document.getElementById('resultado').scrollIntoView({ behavior: 'smooth' });
-                
-            } catch (error) {
-                alert('Erro ao gerar crachá: ' + error.message);
-            }
+                atualizarRelatorio();
+            })
+            .catch(e => alert('Erro ao gerar crachá: ' + e));
         }
-        
-        async function carregarRelatorio() {
-            try {
-                const response = await fetch('/relatorio');
-                const dados = await response.json();
-                
-                const tbody = document.getElementById('corpo-tabela');
+
+        function atualizarRelatorio() {
+            fetch('/relatorio')
+            .then(r => r.json())
+            .then(dados => {
+                const tbody = document.getElementById('tabelaCorpo');
                 tbody.innerHTML = '';
-                
-                if (dados.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="4" style="text-align: center;">Nenhum crachá gerado ainda</td></tr>';
-                } else {
-                    dados.reverse().forEach((item, index) => {
-                        const tr = document.createElement('tr');
-                        tr.innerHTML = `
-                            <td>${item.data_hora}</td>
-                            <td>${item.apartamento}</td>
-                            <td>${item.placa}</td>
-                            <td><button class="btn-excluir" onclick="excluirCracha(${dados.length - 1 - index})">🗑️ Excluir</button></td>
-                        `;
-                        tbody.appendChild(tr);
-                    });
-                }
-                
-                document.getElementById('total-crachas').textContent = `Total: ${dados.length} crachás`;
-                
-            } catch (error) {
-                console.error('Erro ao carregar relatório:', error);
-            }
+                dados.sort((a, b) => {
+                    const numA = parseInt(a.apartamento.match(/\d+/)[0]);
+                    const numB = parseInt(b.apartamento.match(/\d+/)[0]);
+                    return numA - numB;
+                });
+                dados.forEach((item, index) => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${item.data_hora}</td>
+                        <td>${item.apartamento}</td>
+                        <td>${item.placa}</td>
+                        <td><button class="btn-excluir" onclick="excluirCracha(${index})">🗑️ Deletar</button></td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+                document.getElementById('totalCrachas').textContent = `Total de Crachás: ${dados.length}`;
+            });
         }
-        
-        async function excluirCracha(index) {
-            if (!confirm('Deseja realmente excluir este crachá?')) return;
-            
-            try {
-                const response = await fetch(`/excluir/${index}`, { method: 'DELETE' });
-                if (response.ok) {
-                    carregarRelatorio();
+
+        function excluirCracha(index) {
+            if (!confirm('Tem certeza que deseja deletar este crachá?')) return;
+            fetch(`/excluir/${index}`, { method: 'DELETE' })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    atualizarRelatorio();
                 } else {
-                    alert('Erro ao excluir crachá');
+                    alert('Erro ao deletar');
                 }
-            } catch (error) {
-                alert('Erro ao excluir crachá: ' + error.message);
-            }
+            });
         }
-        
+
         function exportarCSV() {
             window.location.href = '/exportar_csv';
         }
-        
-        function baixarCrachaImpressao() {
-            if (!window.crachaImpressaoBase64) {
-                alert('Gere um crachá primeiro!');
-                return;
-            }
-            const link = document.createElement('a');
-            link.href = 'data:image/png;base64,' + window.crachaImpressaoBase64;
-            link.download = 'Cracha-' + window.crachaApartamento + '.png';
-            link.click();
-        }
-        
-        carregarRelatorio();
-        
+
         document.getElementById('placa').addEventListener('keypress', function(e) {
             if (e.key === 'Enter') gerarCracha();
         });
+
+        atualizarRelatorio();
     </script>
 </body>
 </html>

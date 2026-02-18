@@ -119,61 +119,139 @@ def obter_logo_base64():
     return ''
 
 def gerar_cracha_impressao(apartamento, qr_url="https://crachaverte.insuranceandreinsuranceapps.com"):
-    """Gera crachá de impressão no formato 765x1020 pixels (9x12cm)"""
-    largura = 765
-    altura = 1020
+    """Gera crachá de impressão FRENTE (21.5cm x 9.5cm) - Exatamente como PDF Crachá-011A.pdf"""
+    # Dimensões em pixels para 21.5cm x 9.5cm (300 DPI)
+    largura = 2550  # 21.5cm
+    altura = 1134   # 9.5cm
     
     cracha = Image.new('RGB', (largura, altura), 'white')
     draw = ImageDraw.Draw(cracha)
     
-    margem_topo = 80
-    
-    # 1. NÚMERO DO APARTAMENTO (topo) - FONTE GRANDE
+    # 1. NÚMERO DO APARTAMENTO (topo, centralizado)
     try:
-        tamanho_fonte = 250
-        fonte_apt = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", tamanho_fonte)
+        fonte_apt = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 400)
     except:
-        try:
-            fonte_apt = ImageFont.truetype("LiberationSans-Bold.ttf", 240)
-        except:
-            fonte_apt = ImageFont.load_default()
+        fonte_apt = ImageFont.load_default()
     
     bbox = draw.textbbox((0, 0), apartamento, font=fonte_apt)
     text_width = bbox[2] - bbox[0]
-    text_height = bbox[3] - bbox[1]
     x_apt = (largura - text_width) // 2
-    y_apt = margem_topo
-    
+    y_apt = 80
     draw.text((x_apt, y_apt), apartamento, fill='black', font=fonte_apt)
     
-    # 2. LOGO VERTE BELÉM (centro)
+    # 2. LOGO VERTE BELÉM (centro, círculo vermelho)
     try:
         logo = Image.open('logoverte.jpeg')
-        logo_size = 365
+        logo_size = 600
         logo = logo.resize((logo_size, logo_size), Image.Resampling.LANCZOS)
-        
         x_logo = (largura - logo_size) // 2
-        y_logo = y_apt + text_height + 80
-        
+        y_logo = (altura - logo_size) // 2 - 100
         cracha.paste(logo, (x_logo, y_logo))
     except Exception as e:
         print(f"Erro ao carregar logo: {e}")
-        logo_size = 365
-        y_logo = 350
     
-    # 3. QR CODE (parte inferior)
-    qr = qrcode.QRCode(version=1, box_size=10, border=2)
+    # 3. QR CODE (centro-baixo, grande)
+    qr = qrcode.QRCode(version=2, box_size=12, border=3)
     qr.add_data(qr_url)
     qr.make(fit=True)
     qr_img = qr.make_image(fill_color="black", back_color="white")
     
-    qr_size = 295
+    qr_size = 500
     qr_img = qr_img.resize((qr_size, qr_size), Image.Resampling.LANCZOS)
-    
     x_qr = (largura - qr_size) // 2
-    y_qr = y_logo + logo_size + 80
-    
+    y_qr = altura - qr_size - 100
     cracha.paste(qr_img, (x_qr, y_qr))
+    
+    buffer = BytesIO()
+    cracha.save(buffer, format='PNG')
+    buffer.seek(0)
+    img_base64 = base64.b64encode(buffer.getvalue()).decode()
+    
+    return img_base64
+
+def gerar_cracha_verso(apartamento, qr_url="https://crachaverte.insuranceandreinsuranceapps.com"):
+    """Gera verso do crachá com instruções - Exatamente como PDF CracháPremium-143B.pdf"""
+    # Dimensões em pixels para 21.5cm x 9.5cm (300 DPI)
+    largura = 2550  # 21.5cm
+    altura = 1134   # 9.5cm
+    
+    cracha = Image.new('RGB', (largura, altura), 'white')
+    draw = ImageDraw.Draw(cracha)
+    
+    # LADO ESQUERDO: Apartamento + Logo + QR Code
+    # 1. NÚMERO DO APARTAMENTO (topo esquerdo)
+    try:
+        fonte_apt = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 300)
+    except:
+        fonte_apt = ImageFont.load_default()
+    
+    draw.text((100, 80), apartamento, fill='black', font=fonte_apt)
+    
+    # 2. LOGO VERTE BELÉM (esquerda, círculo vermelho)
+    try:
+        logo = Image.open('logoverte.jpeg')
+        logo_size = 400
+        logo = logo.resize((logo_size, logo_size), Image.Resampling.LANCZOS)
+        x_logo = 150
+        y_logo = (altura - logo_size) // 2 - 50
+        cracha.paste(logo, (x_logo, y_logo))
+    except:
+        pass
+    
+    # 3. QR CODE COM BORDA VERMELHA (esquerda-baixo)
+    qr = qrcode.QRCode(version=2, box_size=10, border=2)
+    qr.add_data(qr_url)
+    qr.make(fit=True)
+    qr_img = qr.make_image(fill_color="black", back_color="white")
+    
+    qr_size = 350
+    qr_img = qr_img.resize((qr_size, qr_size), Image.Resampling.LANCZOS)
+    x_qr = 150
+    y_qr = altura - qr_size - 80
+    
+    # Desenhar borda vermelha ao redor do QR
+    draw.rectangle([(x_qr - 20, y_qr - 20), (x_qr + qr_size + 20, y_qr + qr_size + 20)], outline='#B91C3C', width=15)
+    cracha.paste(qr_img, (x_qr, y_qr))
+    
+    # LINHA PONTILHADA VERMELHA (separador)
+    linha_x = largura // 2
+    for y in range(0, altura, 60):
+        draw.line([(linha_x, y), (linha_x, y + 30)], fill='#B91C3C', width=8)
+    
+    # LADO DIREITO: INSTRUÇÕES PREMIUM DE USO
+    try:
+        fonte_titulo = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 80)
+        fonte_texto = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 50)
+    except:
+        fonte_titulo = ImageFont.load_default()
+        fonte_texto = ImageFont.load_default()
+    
+    x_direita = linha_x + 150
+    y_texto = 100
+    
+    # Título
+    draw.text((x_direita, y_texto), "INSTRUÇÕES", fill='#B91C3C', font=fonte_titulo)
+    draw.text((x_direita, y_texto + 100), "PREMIUM DE USO", fill='#B91C3C', font=fonte_titulo)
+    
+    # Instruções
+    y_texto = 350
+    instrucoes = [
+        "• Este crachá é individual",
+        "  e intransferível",
+        "",
+        "• Mantenha pendurado no",
+        "  retrovisor interno",
+        "",
+        "• Extravio: comunique ao",
+        "  Administrador",
+        "",
+        "• Alterações: comunique à",
+        "  Administração"
+    ]
+    
+    for instrucao in instrucoes:
+        draw.text((x_direita, y_texto), instrucao, fill='black', font=fonte_texto)
+        y_texto += 70
     
     buffer = BytesIO()
     cracha.save(buffer, format='PNG')
